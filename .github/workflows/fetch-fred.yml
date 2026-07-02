@@ -1,0 +1,24 @@
+name: Fetch FRED Data
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # todo dia às 12h UTC (9h Brasília)
+  workflow_dispatch:  # permite rodar manualmente pelo botão
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - run: node scripts/fetch-fred.js
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
