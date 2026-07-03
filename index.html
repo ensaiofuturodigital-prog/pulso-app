@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Pulso — Painel do Trader</title>
+<meta name="description" content="Indicadores econômicos, calendário e diário de operações para day trade de WDO e WIN.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230A0E12%22/><path d=%22M10 55 L32 55 L40 30 L52 75 L62 45 L70 55 L90 55%22 fill=%22none%22 stroke=%22%23E2B33C%22 stroke-width=%228%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M6 55 L28 55 L37 26 L50 78 L61 40 L70 55 L94 55" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">PULSO</span>
+        <span class="brand-tag">WDO · WIN</span>
+      </div>
+    </div>
+
+    <svg class="pulse-live" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
+      <polyline id="pulseLine" points="" fill="none" stroke-width="2"/>
+    </svg>
+
+    <div class="session-clock">
+      <span class="dot" id="sessionDot"></span>
+      <span id="clockText">--:--</span>
+      <span class="clock-label" id="sessionLabel">carregando sessão…</span>
+    </div>
+  </header>
+
+  <div class="body-shell">
+
+    <!-- SIDEBAR / TABS -->
+    <nav class="tabs" aria-label="Seções">
+      <button class="tab-btn is-active" data-tab="painel">
+        <svg viewBox="0 0 24 24"><path d="M4 19V10M12 19V5M20 19V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Painel</span>
+      </button>
+      <button class="tab-btn" data-tab="calendario">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3.5 9.5H20.5M8 3V6M16 3V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Calendário</span>
+      </button>
+      <button class="tab-btn" data-tab="radar">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12 L18 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Radar</span>
+      </button>
+      <button class="tab-btn" data-tab="diario">
+        <svg viewBox="0 0 24 24"><path d="M6 3.5H15L19 7.5V20.5H6V3.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12H15M9 15.5H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Diário</span>
+      </button>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="panels">
+
+      <!-- PAINEL -->
+      <section class="panel is-active" id="panel-painel">
+        <div class="panel-head">
+          <h1>Painel de indicadores</h1>
+          <p>Dados oficiais do FRED, atualizados automaticamente todo dia às 9h (Brasília). Isto é contexto para sua análise — não é recomendação de operação.</p>
+        </div>
+        <div class="card-grid" id="indicatorsGrid">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+      </section>
+
+      <!-- CALENDARIO -->
+      <section class="panel" id="panel-calendario">
+        <div class="panel-head">
+          <h1>Histórico de divulgações</h1>
+          <p>Últimas divulgações registradas por indicador. Um calendário de <em>próximos</em> eventos com consenso de mercado ainda não está conectado.</p>
+        </div>
+        <div class="timeline" id="calendarList">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+      </section>
+
+      <!-- RADAR -->
+      <section class="panel" id="panel-radar">
+        <div class="panel-head">
+          <h1>Radar geopolítico</h1>
+          <p>Medidor de tensão por região, baseado em cobertura noticiosa.</p>
+        </div>
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" width="34" height="34"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
+          <h3>Ainda sem sinal</h3>
+          <p>A coleta de dados geopolíticos (GDELT + notícias de alto impacto) é a próxima peça do pipeline. Quando estiver ativa, cada região aparece aqui com uma barra de tensão, igual à dos indicadores.</p>
+        </div>
+      </section>
+
+      <!-- DIARIO -->
+      <section class="panel" id="panel-diario">
+        <div class="panel-head">
+          <h1>Diário de operações</h1>
+          <p>Registre cada trade em segundos. Com o tempo, isso revela seus próprios padrões — não é sinal, é autoconhecimento com dado.</p>
+        </div>
+
+        <form class="trade-form" id="tradeForm">
+          <div class="field">
+            <label for="tf-asset">Ativo</label>
+            <select id="tf-asset" required>
+              <option value="WDO">WDO — Mini Dólar</option>
+              <option value="WIN">WIN — Mini Índice</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="tf-time">Horário</label>
+            <input type="datetime-local" id="tf-time" required>
+          </div>
+          <div class="field field-wide">
+            <label for="tf-reason">O que motivou a entrada</label>
+            <input type="text" id="tf-reason" placeholder="Ex: rompimento de máxima após payroll" maxlength="140">
+          </div>
+          <div class="field">
+            <label for="tf-result">Resultado (pontos)</label>
+            <input type="number" id="tf-result" step="any" placeholder="Ex: -12 ou 34">
+          </div>
+          <div class="field field-wide">
+            <label for="tf-notes">Notas</label>
+            <input type="text" id="tf-notes" placeholder="O que você faria diferente?" maxlength="200">
+          </div>
+          <button type="submit" class="btn-primary">Registrar operação</button>
+          <span class="form-status" id="formStatus"></span>
+        </form>
+
+        <div class="journal-summary" id="journalSummary"></div>
+        <div class="journal-list" id="journalList">
+          <div class="skeleton-row"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
