@@ -14,8 +14,9 @@ const SERIES = [
   { code: '1', series_id: 'BCB_USDBRL', name_pt: 'Câmbio USD/BRL (PTAX)', description_pt: 'Cotação oficial do dólar frente ao real. Referência direta para o WDO — também usamos essa série para medir a reação do mercado a outros indicadores.', frequency: 'daily' },
 ];
 
-// Datas iniciais mais realistas por série (evita pedir 40 anos de uma série mensal e tomar timeout)
-const START_DATE = { '432': '2000-01-01', '433': '2000-01-01', '1': '1999-01-01' };
+const START_YEAR = { '432': 2000, '433': 2000, '1': 1999 };
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function chunk(arr, size) {
   const out = [];
@@ -23,23 +24,36 @@ function chunk(arr, size) {
   return out;
 }
 
+// A API do BCB corta consultas muito longas — buscamos ano a ano e juntamos tudo.
 async function fetchBcbSeries(code) {
-  const start = START_DATE[code] || '2000-01-01';
-  const [y, m, d] = start.split('-');
-  const dataInicial = `${d}/${m}/${y}`;
-  const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.${code}/dados?formato=json&dataInicial=${dataInicial}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Erro ao buscar série ${code}: ${res.status}`);
-  const data = await res.json();
-  // BCB já retorna do mais antigo pro mais novo — mantemos essa ordem
-  return data.map(d => ({
-    date: d.data.split('/').reverse().join('-'),
-    value: parseFloat(d.valor.replace(',', '.')),
-  }));
+  const startYear = START_YEAR[code] || 2000;
+  const currentYear = new Date().getFullYear();
+  let all = [];
+
+  for (let year = startYear; year <= currentYear; year++) {
+    const dataInicial = `01/01/${year}`;
+    const dataFinal = year === currentYear
+      ? new Date().toLocaleDateString('pt-BR')
+      : `31/12/${year}`;
+    const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.${code}/dados?formato=json&dataInicial=${dataInicial}&dataFinal=${dataFinal}`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) { console.log(`  aviso: ano ${year} respondeu ${res.status}`); continue; }
+      const data = await res.json();
+      all = all.concat(data.map(d => ({
+        date: d.data.split('/').reverse().join('-'),
+        value: parseFloat(d.valor.replace(',', '.')),
+      })));
+    } catch (err) {
+      console.log(`  aviso: falha no ano ${year}: ${err.message}`);
+    }
+    await sleep(300); // educado com a API gratuita
+  }
+  return all;
 }
 
 async function run() {
-  console.log('Iniciando busca de histórico completo do Banco Central...');
+  console.log('Iniciando busca de histórico completo do Banco Central (ano a ano)...');
 
   for (const serie of SERIES) {
     try {
@@ -69,7 +83,7 @@ async function run() {
         if (error) console.error(`Erro no lote de ${serie.series_id}:`, error.message);
       }
 
-      console.log(`✅ ${serie.series_id}: ${rows.length} pontos históricos (desde ${observations[0].date})`);
+      console.log(`✅ ${serie.series_id}: ${rows.length} pontos históricos (desde ${observations[0].date} até ${observations[observations.length - 1].date})`);
     } catch (err) {
       console.error(`❌ Falha em ${serie.series_id}:`, err.message);
     }
