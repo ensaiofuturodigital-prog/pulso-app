@@ -7,7 +7,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Indicadores que mais afetam WDO e WIN — lista ampliada
+// Indicadores que mais afetam WDO e WIN
 const INDICATORS = [
   { code: 'CPIAUCSL', name_pt: 'Inflação ao Consumidor - CPI (EUA)', description_pt: 'Mede a variação de preços nos EUA. Sobe = pressão pro Fed subir juros = dólar tende a fortalecer.', frequency: 'monthly' },
   { code: 'CPILFESL', name_pt: 'Núcleo do CPI - Core CPI (EUA)', description_pt: 'Inflação sem alimentos e energia. É o que o Fed mais observa por ser menos volátil.', frequency: 'monthly' },
@@ -27,60 +27,55 @@ const INDICATORS = [
   { code: 'BOPGSTB', name_pt: 'Balança Comercial (EUA)', description_pt: 'Diferença entre exportações e importações americanas.', frequency: 'monthly' },
 ];
 
+// Busca o máximo de histórico que o FRED permitir (cada série tem uma data de início diferente)
+const HISTORY_START = '1995-01-01';
+
 async function fetchFredSeries(code) {
-  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${code}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=8`;
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${code}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${HISTORY_START}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Erro ao buscar ${code}: ${res.status}`);
   const data = await res.json();
   return data.observations.filter(o => o.value !== '.');
 }
 
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 async function run() {
-  console.log('Iniciando busca de indicadores do FRED...');
+  console.log('Iniciando busca de histórico completo do FRED...');
 
   for (const ind of INDICATORS) {
     try {
       const { data: upserted, error: upsertError } = await supabase
         .from('indicators')
         .upsert(
-          {
-            code: ind.code,
-            name_pt: ind.name_pt,
-            description_pt: ind.description_pt,
-            source: 'fred',
-            country: 'US',
-            frequency: ind.frequency,
-          },
+          { code: ind.code, name_pt: ind.name_pt, description_pt: ind.description_pt, source: 'fred', country: 'US', frequency: ind.frequency },
           { onConflict: 'code' }
         )
         .select()
         .single();
-
       if (upsertError) throw upsertError;
       const indicatorId = upserted.id;
 
       const observations = await fetchFredSeries(ind.code);
+      if (observations.length === 0) { console.log(`⚠️  ${ind.code}: nenhum dado retornado`); continue; }
 
-      for (let i = 0; i < observations.length; i++) {
-        const obs = observations[i];
-        const previous = observations[i + 1] ? parseFloat(observations[i + 1].value) : null;
+      const rows = observations.map((obs, i) => ({
+        indicator_id: indicatorId,
+        release_date: obs.date,
+        actual_value: parseFloat(obs.value),
+        previous_value: i > 0 ? parseFloat(observations[i - 1].value) : null,
+      }));
 
-        const { error: releaseError } = await supabase
-          .from('indicator_releases')
-          .upsert(
-            {
-              indicator_id: indicatorId,
-              release_date: obs.date,
-              actual_value: parseFloat(obs.value),
-              previous_value: previous,
-            },
-            { onConflict: 'indicator_id,release_date' }
-          );
-
-        if (releaseError) console.error(`Erro ao salvar ${ind.code} em ${obs.date}:`, releaseError.message);
+      for (const batch of chunk(rows, 500)) {
+        const { error } = await supabase.from('indicator_releases').upsert(batch, { onConflict: 'indicator_id,release_date' });
+        if (error) console.error(`Erro no lote de ${ind.code}:`, error.message);
       }
 
-      console.log(`✅ ${ind.code} atualizado (${observations.length} pontos)`);
+      console.log(`✅ ${ind.code}: ${rows.length} pontos históricos (desde ${observations[0].date})`);
     } catch (err) {
       console.error(`❌ Falha em ${ind.code}:`, err.message);
     }
