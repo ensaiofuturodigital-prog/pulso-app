@@ -5,28 +5,37 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Regiões monitoradas — cada uma vira uma "barra de tensão" no Radar.
-// Fonte: GDELT (gratuita, pública). Mede o tom médio da cobertura noticiosa:
-// tom bem negativo = tensão alta. Isso é um proxy, não uma medição exata.
+// Regiões monitoradas — focadas nos blocos que estruturalmente movem o dólar
+// (Brasil, EUA, Zona do Euro). Fonte: GDELT (gratuita, pública). Mede o tom médio
+// da cobertura noticiosa: tom bem negativo = tensão alta. É um proxy, não uma
+// medição exata — e cobre risco econômico/político, não risco de guerra.
 const REGIONS = [
-  { code: 'GEO_CHINA', label: 'China', query: 'China economy OR China trade' },
-  { code: 'GEO_ORIENTE_MEDIO', label: 'Oriente Médio', query: 'Middle East conflict' },
-  { code: 'GEO_RUSSIA_UCRANIA', label: 'Rússia / Ucrânia', query: 'Russia Ukraine war' },
-  { code: 'GEO_BRASIL_FISCAL', label: 'Brasil - Risco Fiscal', query: 'Brazil fiscal deficit' },
-  { code: 'GEO_EUA_FED', label: 'EUA - Política Monetária', query: 'Federal Reserve interest rates' },
+  { code: 'GEO_BRASIL', label: 'Brasil', query: 'Brazil economy fiscal risk' },
+  { code: 'GEO_EUA', label: 'EUA', query: 'United States Federal Reserve economy' },
+  { code: 'GEO_ZONA_EURO', label: 'Zona do Euro', query: 'Eurozone ECB economy' },
 ];
 
-async function fetchTone(query) {
+async function fetchTone(query, attempt = 1) {
   const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=timelinetone&format=json`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`GDELT respondeu ${res.status}`);
-  const data = await res.json();
 
+  if (res.status === 429 && attempt < 3) {
+    console.log(`  ...limite de pedidos atingido, esperando 10s antes de tentar de novo (tentativa ${attempt})`);
+    await sleep(10000);
+    return fetchTone(query, attempt + 1);
+  }
+  if (!res.ok) throw new Error(`GDELT respondeu ${res.status}`);
+
+  const data = await res.json();
   const series = data?.timeline?.[0]?.data;
   if (!series || series.length === 0) throw new Error('Sem dados de tom retornados');
 
   const last = series[series.length - 1];
   return typeof last.value === 'number' ? last.value : parseFloat(last.value);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function toneToTension(tone) {
@@ -56,8 +65,8 @@ async function run() {
       successCount++;
     } catch (err) {
       console.error(`❌ Falha em ${region.label}:`, err.message);
-      // Continua pras próximas regiões mesmo se uma falhar
     }
+    await sleep(4000); // pausa entre regiões pra não sobrecarregar a API gratuita
   }
 
   console.log(`Finalizado. ${successCount}/${REGIONS.length} regiões atualizadas.`);
