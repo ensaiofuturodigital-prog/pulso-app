@@ -4,8 +4,24 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Encontra, numa lista ordenada de [data, valor], o índice do último ponto
-// com data <= alvo (ou seja, o dia de pregão mais próximo, pra trás, da divulgação)
+// O Supabase limita cada consulta a 1000 linhas — pra séries longas
+// (milhares de pontos) precisamos buscar em páginas e juntar tudo.
+async function fetchAllRows(table, select, filters = (q) => q, orderCol = 'release_date') {
+  let all = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    let query = supabase.from(table).select(select).order(orderCol, { ascending: true }).range(from, from + pageSize - 1);
+    query = filters(query);
+    const { data, error } = await query;
+    if (error) throw error;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 function findIndexOnOrBefore(sortedDates, targetDate) {
   let lo = 0, hi = sortedDates.length - 1, ans = -1;
   while (lo <= hi) {
@@ -23,18 +39,17 @@ async function run() {
     .from('indicators').select('id').eq('code', 'BCB_USDBRL').single();
   if (usdErr || !usdIndicator) throw new Error('Indicador BCB_USDBRL não encontrado — rode o fetch-bcb.js primeiro.');
 
-  const { data: usdReleasesRaw } = await supabase
-    .from('indicator_releases')
-    .select('release_date, actual_value')
-    .eq('indicator_id', usdIndicator.id)
-    .order('release_date', { ascending: true });
-
+  const usdReleasesRaw = await fetchAllRows(
+    'indicator_releases',
+    'release_date, actual_value',
+    (q) => q.eq('indicator_id', usdIndicator.id)
+  );
   const usdSeries = usdReleasesRaw.map(r => ({ date: r.release_date, value: r.actual_value }));
-  console.log(`Série do dólar carregada: ${usdSeries.length} pontos.`);
+  console.log(`Série do dólar carregada: ${usdSeries.length} pontos (${usdSeries[0]?.date} a ${usdSeries[usdSeries.length - 1]?.date}).`);
 
   function usdDirectionOn(targetDate) {
     const idx = findIndexOnOrBefore(usdSeries, targetDate);
-    if (idx <= 0) return null; // sem dia anterior pra comparar
+    if (idx <= 0) return null;
     const today = usdSeries[idx].value;
     const prev = usdSeries[idx - 1].value;
     if (today > prev) return 'up';
@@ -42,16 +57,15 @@ async function run() {
     return 'flat';
   }
 
-  const { data: indicators } = await supabase
-    .from('indicators').select('id, code').neq('code', 'BCB_USDBRL');
+  const { data: indicators } = await supabase.from('indicators').select('id, code').neq('code', 'BCB_USDBRL');
 
   for (const ind of indicators) {
     try {
-      const { data: releases } = await supabase
-        .from('indicator_releases')
-        .select('release_date, actual_value, previous_value')
-        .eq('indicator_id', ind.id)
-        .order('release_date', { ascending: true });
+      const releases = await fetchAllRows(
+        'indicator_releases',
+        'release_date, actual_value, previous_value',
+        (q) => q.eq('indicator_id', ind.id)
+      );
 
       let up = 0, down = 0, usdUpAfterUp = 0, usdUpAfterDown = 0;
       let firstDate = null, lastDate = null;
@@ -87,7 +101,7 @@ async function run() {
       }, { onConflict: 'indicator_id' });
 
       if (error) throw error;
-      console.log(`✅ ${ind.code}: amostra de ${sampleSize} divulgações calculada`);
+      console.log(`✅ ${ind.code}: amostra de ${sampleSize} divulgações (${firstDate} a ${lastDate})`);
     } catch (err) {
       console.error(`❌ Falha em ${ind.code}:`, err.message);
     }
