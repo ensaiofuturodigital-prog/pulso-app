@@ -2,7 +2,7 @@ name: Fetch Overnight News
 
 on:
   schedule:
-    - cron: '0 11 * * *'  # todo dia às 11h UTC (8h Brasília)
+    - cron: '55 10 * * *'  # todo dia às 10h55 UTC (7h55 Brasília)
   workflow_dispatch:
 
 jobs:

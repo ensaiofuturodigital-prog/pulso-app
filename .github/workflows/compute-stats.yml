@@ -2,7 +2,7 @@ name: Compute Indicator Stats
 
 on:
   schedule:
-    - cron: '45 12 * * *'  # todo dia às 12h45 UTC (9h45 Brasília), depois dos outros robôs
+    - cron: '40 10 * * *'  # todo dia às 10h40 UTC (7h40 Brasília), depois dos outros robôs
   workflow_dispatch:
 
 jobs:

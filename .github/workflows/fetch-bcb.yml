@@ -2,7 +2,7 @@ name: Fetch BCB Data
 
 on:
   schedule:
-    - cron: '15 12 * * *'  # todo dia às 12h15 UTC (9h15 Brasília)
+    - cron: '10 10 * * *'  # todo dia às 10h10 UTC (7h10 Brasília)
   workflow_dispatch:
 
 jobs:

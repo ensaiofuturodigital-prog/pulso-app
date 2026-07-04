@@ -2,7 +2,7 @@ name: Fetch Ibovespa Data
 
 on:
   schedule:
-    - cron: '35 12 * * *'  # todo dia às 12h35 UTC (9h35 Brasília)
+    - cron: '20 10 * * *'  # todo dia às 10h20 UTC (7h20 Brasília)
   workflow_dispatch:
 
 jobs:
