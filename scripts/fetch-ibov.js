@@ -36,9 +36,18 @@ async function run() {
   if (upsertError) throw upsertError;
   const indicatorId = upserted.id;
 
-  const res = await fetch(STOOQ_URL);
+  const res = await fetch(STOOQ_URL, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      'Accept': 'text/csv,*/*',
+    },
+  });
+  console.log(`Stooq respondeu HTTP ${res.status}`);
   if (!res.ok) throw new Error(`Stooq respondeu ${res.status}`);
   const csv = await res.text();
+
+  console.log('Primeiros 200 caracteres da resposta (diagnóstico):');
+  console.log(csv.slice(0, 200));
 
   const lines = csv.trim().split('\n').slice(1); // remove cabeçalho
   const observations = lines
@@ -48,7 +57,9 @@ async function run() {
     })
     .filter(o => o.date && !isNaN(o.value));
 
-  if (observations.length === 0) throw new Error('Nenhum dado retornado pelo Stooq');
+  console.log(`Linhas brutas: ${lines.length} | Observações válidas: ${observations.length}`);
+
+  if (observations.length === 0) throw new Error('Nenhum dado válido após o parsing — veja o trecho da resposta acima pra diagnosticar.');
 
   const rows = observations.map((obs, i) => ({
     indicator_id: indicatorId,
