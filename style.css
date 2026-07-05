@@ -1,11 +1,11 @@
 :root {
-  --bg: #0A0E12;
-  --surface: #12181F;
-  --surface-2: #1A222C;
-  --border: #232D38;
-  --text: #E7ECF0;
-  --text-dim: #8B99A6;
-  --text-faint: #55626F;
+  --bg: #14181D;
+  --surface: #1B2129;
+  --surface-2: #242C36;
+  --border: #2E3742;
+  --text: #F5F7F9;
+  --text-dim: #C7CED6;
+  --text-faint: #8994A1;
 
   --gold: #E2B33C;
   --gold-dim: #E2B33C33;
@@ -71,7 +71,7 @@ button, input, select {
 .brand-name {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 18px;
+  font-size: 20px;
   letter-spacing: 0.06em;
 }
 .brand-tag {
@@ -181,23 +181,23 @@ button, input, select {
 /* ---------- PANELS ---------- */
 .panels {
   flex: 1;
-  padding: 28px 20px 100px;
+  padding: 24px 20px 100px;
   min-width: 0;
 }
-@media (min-width: 860px) { .panels { padding: 32px 32px 48px; } }
+@media (min-width: 860px) { .panels { padding: 26px 32px 40px; } }
 
 .panel { display: none; animation: fadeIn 0.25s ease; }
 .panel.is-active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-.panel-head { margin-bottom: 22px; max-width: 640px; }
+.panel-head { margin-bottom: 16px; max-width: 680px; }
 .panel-head h1 {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 600;
   margin: 0 0 6px;
 }
-.panel-head p { color: var(--text-dim); font-size: 14px; line-height: 1.55; margin: 0; }
+.panel-head p { color: var(--text-dim); font-size: 15.5px; line-height: 1.6; margin: 0; }
 .panel-head em { color: var(--text); font-style: normal; }
 
 /* ---------- CARDS: INDICATORS ---------- */
@@ -220,7 +220,7 @@ button, input, select {
   gap: 8px;
   margin-bottom: 10px;
 }
-.ind-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.ind-name { font-size: 15.5px; font-weight: 600; line-height: 1.3; }
 .ind-code { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); letter-spacing: 0.05em; }
 .ind-badge {
   font-family: var(--font-mono);
@@ -241,8 +241,8 @@ button, input, select {
   margin-bottom: 10px;
   font-family: var(--font-mono);
 }
-.ind-value { font-size: 22px; font-weight: 600; }
-.ind-prev { font-size: 12px; color: var(--text-faint); }
+.ind-value { font-size: 25px; font-weight: 600; }
+.ind-prev { font-size: 13px; color: var(--text-dim); }
 
 .pulse-bar {
   height: 5px;
@@ -256,8 +256,8 @@ button, input, select {
 .pulse-bar-fill.down { background: var(--coral); }
 .pulse-bar-fill.flat { background: var(--text-faint); }
 
-.ind-desc { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin: 0 0 8px; }
-.ind-date { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); }
+.ind-desc { font-size: 14px; color: var(--text-dim); line-height: 1.55; margin: 0 0 8px; }
+.ind-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
 
 /* ---------- TIMELINE (calendario) ---------- */
 .timeline { display: flex; flex-direction: column; gap: 2px; }
@@ -292,8 +292,8 @@ button, input, select {
 .tl-dot.down { background: var(--coral); }
 .tl-dot.flat { background: var(--text-faint); }
 .tl-body { flex: 1; min-width: 0; }
-.tl-name { font-size: 13.5px; font-weight: 500; }
-.tl-vals { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); }
+.tl-name { font-size: 14.5px; font-weight: 500; }
+.tl-vals { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-dim); }
 
 /* ---------- EMPTY STATE ---------- */
 .empty-state {
@@ -323,13 +323,13 @@ button, input, select {
 }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-wide { grid-column: 1 / -1; }
-.field label { font-size: 11.5px; color: var(--text-faint); font-family: var(--font-mono); }
+.field label { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
 .field input, .field select {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 9px 10px;
-  font-size: 13.5px;
+  padding: 10px 12px;
+  font-size: 15px;
   outline: none;
 }
 .field input:focus, .field select:focus { border-color: var(--gold); }
@@ -340,9 +340,9 @@ button, input, select {
   color: #1A1305;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 11px;
+  padding: 12px;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 14.5px;
   cursor: pointer;
   transition: filter 0.15s;
 }
@@ -367,7 +367,7 @@ button, input, select {
   min-width: 110px;
 }
 .js-stat-label { font-size: 10.5px; color: var(--text-faint); font-family: var(--font-mono); text-transform: uppercase; }
-.js-stat-value { font-family: var(--font-mono); font-size: 18px; font-weight: 600; margin-top: 2px; }
+.js-stat-value { font-family: var(--font-mono); font-size: 20px; font-weight: 600; margin-top: 2px; }
 .js-stat-value.pos { color: var(--teal); }
 .js-stat-value.neg { color: var(--coral); }
 
@@ -391,7 +391,7 @@ button, input, select {
   flex-shrink: 0;
 }
 .j-info { flex: 1; min-width: 0; }
-.j-reason { font-size: 13px; }
+.j-reason { font-size: 14.5px; }
 .j-time { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); }
 .j-result { font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
 .j-result.pos { color: var(--teal); }
@@ -438,10 +438,10 @@ button, input, select {
 
 .section-subhead {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
-  margin: 28px 0 12px;
-  color: var(--text-dim);
+  margin: 22px 0 10px;
+  color: var(--text);
 }
 
 .date-caveat {
@@ -475,8 +475,8 @@ button, input, select {
   border-radius: var(--radius-sm);
   padding: 10px 12px;
 }
-.summary-item-head { font-size: 13.5px; margin-bottom: 8px; }
-.summary-scenario { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
+.summary-item-head { font-size: 15px; margin-bottom: 8px; }
+.summary-scenario { font-size: 13.5px; color: var(--text-dim); margin-top: 4px; }
 .summary-scenario b { color: var(--text-faint); font-weight: 500; }
 .star-badge { color: var(--gold); font-size: 11px; letter-spacing: 1px; }
 
@@ -511,7 +511,7 @@ button, input, select {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14px;
 }
 .week-label { font-family: var(--font-mono); color: var(--text-dim); width: 70px; flex-shrink: 0; }
 .week-count, .week-winrate { color: var(--text-faint); font-size: 12px; }
@@ -723,8 +723,8 @@ button, input, select {
   padding-top: 1px;
 }
 .news-body { flex: 1; min-width: 0; }
-.news-title { font-size: 13.5px; line-height: 1.4; margin-bottom: 4px; }
-.news-source { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); }
+.news-title { font-size: 14.5px; line-height: 1.45; margin-bottom: 4px; }
+.news-source { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
 
 /* ---------- DATE NAV (Resumo do dia com navegação histórica) ---------- */
 .date-nav {
