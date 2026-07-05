@@ -22,7 +22,7 @@ async function getReleaseId(seriesCode) {
 
 async function getReleaseDates(releaseId) {
   // Pega desde 2015 pra trás não precisamos, e inclui datas futuras já agendadas pelo FRED
-  const url = `https://api.stlouisfed.org/fred/release/dates?release_id=${releaseId}&api_key=${FRED_API_KEY}&file_type=json&realtime_start=2015-01-01&realtime_end=2027-12-31&include_release_dates_with_no_data=true&sort_order=asc`;
+  const url = `https://api.stlouisfed.org/fred/release/dates?release_id=${releaseId}&api_key=${FRED_API_KEY}&file_type=json&realtime_start=1950-01-01&realtime_end=2027-12-31&include_release_dates_with_no_data=true&sort_order=asc`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Erro ao buscar datas do release ${releaseId}: ${res.status}`);
   const data = await res.json();
@@ -32,10 +32,15 @@ async function getReleaseDates(releaseId) {
 async function run() {
   console.log('Buscando calendário real de divulgações do FRED...');
 
+  // DFF, DGS10 e DTWEXBGS são séries de mercado contínuas (têm valor todo dia útil),
+  // não divulgações pontuais — não fazem sentido no calendário de "eventos do dia".
+  const CONTINUOUS_SERIES = ['DFF', 'DGS10', 'DTWEXBGS'];
+
   const { data: indicators } = await supabase
     .from('indicators')
     .select('id, code')
-    .eq('source', 'fred');
+    .eq('source', 'fred')
+    .not('code', 'in', `(${CONTINUOUS_SERIES.join(',')})`);
 
   for (const ind of indicators) {
     try {
