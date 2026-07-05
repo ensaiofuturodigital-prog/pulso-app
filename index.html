@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230A0E12%22/><path d=%22M10 55 L32 55 L40 30 L52 75 L62 45 L70 55 L90 55%22 fill=%22none%22 stroke=%22%23E2B33C%22 stroke-width=%228%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -46,10 +46,6 @@
         <svg viewBox="0 0 24 24"><path d="M4 19V10M12 19V5M20 19V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Painel</span>
       </button>
-      <button class="tab-btn" data-tab="resumo">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M9 9h.01M15 15h.01M15.5 8.5l-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <span>Resumo</span>
-      </button>
       <button class="tab-btn" data-tab="calendario">
         <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3.5 9.5H20.5M8 3V6M16 3V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Calendário</span>
@@ -71,8 +67,30 @@
       <section class="panel is-active" id="panel-painel">
         <div class="panel-head">
           <h1>Painel de indicadores</h1>
-          <p>Dados oficiais do FRED, atualizados automaticamente todo dia às 9h (Brasília). Isto é contexto para sua análise — não é recomendação de operação.</p>
+          <p>Dados oficiais do FRED e do Banco Central, atualizados automaticamente todo dia às 8h (Brasília). Clique em "Ver probabilidade histórica" em qualquer cartão: se o dado vier acima ou abaixo do anterior, veja pra qual lado o WDO e o WIN tenderam historicamente. Isto é contexto para sua análise — não é recomendação de operação.</p>
         </div>
+
+        <details class="daily-summary" id="dailySummary" open>
+          <summary id="dailySummaryHead">Carregando resumo do dia...</summary>
+          <div id="dailySummaryBody">
+            <div class="date-nav">
+              <button class="date-nav-btn" id="dayPrev" type="button" aria-label="Dia anterior">‹</button>
+              <input type="date" id="daySummaryDate" class="date-input">
+              <button class="date-nav-btn" id="dayNext" type="button" aria-label="Próximo dia">›</button>
+              <button class="date-nav-btn date-today" id="dayToday" type="button">Hoje</button>
+            </div>
+            <div id="dailySummaryRetro"></div>
+            <div id="dailySummaryItems"></div>
+          </div>
+        </details>
+
+        <div class="importance-filter" id="importanceFilter">
+          <span class="filter-label">Mostrar:</span>
+          <button class="filter-btn is-active" data-min="1">★ todos</button>
+          <button class="filter-btn" data-min="2">★★ relevantes</button>
+          <button class="filter-btn" data-min="3">★★★ só os mais fortes</button>
+        </div>
+
         <div class="card-grid" id="indicatorsGrid">
           <div class="skeleton-card"></div>
           <div class="skeleton-card"></div>
@@ -80,38 +98,21 @@
         </div>
       </section>
 
-      <!-- RESUMO DO DIA -->
-      <section class="panel" id="panel-resumo">
-        <div class="panel-head">
-          <h1>Resumo do dia</h1>
-          <p>Probabilidade histórica agregada dos indicadores divulgados numa data — <em>estatística do passado, não recomendação de operação</em>. Navegue por qualquer dia disponível, inclusive datas antigas, pra estudar o que aconteceu.</p>
-        </div>
-
-        <div class="date-nav">
-          <button class="date-nav-btn" id="dayPrev" type="button" aria-label="Dia anterior">‹</button>
-          <input type="date" id="daySummaryDate" class="date-input">
-          <button class="date-nav-btn" id="dayNext" type="button" aria-label="Próximo dia">›</button>
-          <button class="date-nav-btn date-today" id="dayToday" type="button">Hoje</button>
-        </div>
-
-        <div id="daySummaryContent">
-          <div class="skeleton-card"></div>
-        </div>
-      </section>
-
       <!-- CALENDARIO -->
       <section class="panel" id="panel-calendario">
         <div class="panel-head">
-          <h1>Calendário</h1>
-          <p>Próximos eventos agendados (calendário oficial do FRED) e histórico de divulgações já registradas.</p>
+          <h1>Calendário econômico</h1>
+          <p>Próximos eventos com consenso de mercado (widget gratuito da Investing.com, só Brasil/EUA/Zona do Euro) e, abaixo, o histórico do que já foi divulgado no nosso banco.</p>
+          <p class="date-caveat">⚠️ Nas datas do histórico abaixo: para dados mensais dos EUA, a data mostrada é o <em>mês de referência</em> (ex: dado de maio), não necessariamente o dia exato do anúncio — essa correção ainda está pendente.</p>
         </div>
 
-        <h2 class="section-subhead">Próximos eventos</h2>
-        <div class="timeline" id="upcomingList">
-          <p class="empty-note">Carregando agenda…</p>
+        <div class="widget-frame">
+          <iframe src="https://sslecal2.investing.com/?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone&countries=32,5,72&calType=week&timeZone=12&lang=12"
+            width="100%" height="480" frameborder="0" allowtransparency="true" title="Calendário econômico Investing.com" loading="lazy"></iframe>
+          <p class="widget-credit">Widget oficial e gratuito da <a href="https://www.investing.com" target="_blank" rel="noopener">Investing.com</a>, filtrado só pra Brasil, EUA e Zona do Euro.</p>
         </div>
 
-        <h2 class="section-subhead">Histórico</h2>
+        <h2 class="section-subhead">Histórico registrado (nosso banco)</h2>
         <div class="timeline" id="calendarList">
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
@@ -121,11 +122,13 @@
       <!-- RADAR -->
       <section class="panel" id="panel-radar">
         <div class="panel-head">
-          <h1>Radar geopolítico</h1>
-          <p>Medidor de tensão por região, baseado em cobertura noticiosa.</p>
+          <h1>Radar da madrugada</h1>
+          <p>Varredura de notícias entre 18h de ontem e 8h de hoje (Brasília) — qualquer evento relevante em qualquer país, que possa mexer com o dólar na abertura.</p>
         </div>
-        <div id="radarContent">
-          <div class="skeleton-card"></div>
+        <div class="news-list" id="newsList">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
         </div>
       </section>
 
@@ -136,8 +139,9 @@
           <p>Registre cada trade em segundos. Com o tempo, isso revela seus próprios padrões — não é sinal, é autoconhecimento com dado.</p>
         </div>
 
+        <h2 class="section-subhead">Ativos</h2>
         <form class="trade-form" id="tradeForm">
-          <div class="field">
+          <div class="field field-wide">
             <label for="tf-asset">Ativo</label>
             <select id="tf-asset" required>
               <option value="WDO">WDO — Mini Dólar</option>
@@ -145,20 +149,24 @@
             </select>
           </div>
           <div class="field">
-            <label for="tf-time">Horário</label>
-            <input type="datetime-local" id="tf-time" required>
-          </div>
-          <div class="field field-wide">
-            <label for="tf-reason">O que motivou a entrada</label>
-            <input type="text" id="tf-reason" placeholder="Ex: rompimento de máxima após payroll" maxlength="140">
+            <label for="tf-entry-price">Preço de entrada</label>
+            <input type="number" id="tf-entry-price" step="any" placeholder="Ex: 5417,50">
           </div>
           <div class="field">
-            <label for="tf-result">Resultado (pontos)</label>
-            <input type="number" id="tf-result" step="any" placeholder="Ex: -12 ou 34">
+            <label for="tf-entry-time">Data e horário de entrada</label>
+            <input type="datetime-local" id="tf-entry-time" required>
+          </div>
+          <div class="field">
+            <label for="tf-exit-price">Preço de saída</label>
+            <input type="number" id="tf-exit-price" step="any" placeholder="Ex: 5429,50">
+          </div>
+          <div class="field">
+            <label for="tf-exit-time">Data e horário de saída</label>
+            <input type="datetime-local" id="tf-exit-time">
           </div>
           <div class="field field-wide">
-            <label for="tf-notes">Notas</label>
-            <input type="text" id="tf-notes" placeholder="O que você faria diferente?" maxlength="200">
+            <label for="tf-result">Resultado (pontos)</label>
+            <input type="number" id="tf-result" step="any" placeholder="Ex: -12 ou 34">
           </div>
           <button type="submit" class="btn-primary">Registrar operação</button>
           <span class="form-status" id="formStatus"></span>
@@ -168,6 +176,20 @@
         <div class="journal-list" id="journalList">
           <div class="skeleton-row"></div>
         </div>
+
+        <h2 class="section-subhead">Resultado da semana</h2>
+        <div class="weekly-summary" id="weeklySummary"></div>
+
+        <h2 class="section-subhead">Bloco de notas</h2>
+        <div class="notepad-wrap">
+          <textarea id="notepadArea" maxlength="1000" placeholder="Anote aqui o que precisa revisar, corrigir, lembrar... (até 1000 caracteres)"></textarea>
+          <span class="notepad-status" id="notepadStatus"></span>
+          <span class="notepad-counter" id="notepadCounter">0/1000</span>
+        </div>
+
+        <h2 class="section-subhead">Calendário de feriados</h2>
+        <p class="calendar-legend-intro">Dias em que a B3 (Brasil) ou as bolsas dos EUA ficam fechadas.</p>
+        <div class="holiday-calendar" id="holidayCalendar"></div>
       </section>
 
     </main>

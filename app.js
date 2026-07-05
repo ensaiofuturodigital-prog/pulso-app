@@ -91,41 +91,106 @@ function monthLabel(d) {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(d + 'T12:00:00'));
 }
 function todayStrBR() {
-  // en-CA formata como YYYY-MM-DD, o mesmo formato que o banco usa
+  // en-CA formata como YYYY-MM-DD, o mesmo formato usado no banco
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
+function countryFlag(c) {
+  return c === 'BR' ? '🇧🇷' : c === 'US' ? '🇺🇸' : '';
+}
+function starRating(n) {
+  const stars = n || 1;
+  return '★'.repeat(stars) + '☆'.repeat(3 - stars);
+}
+function sparklineSvg(points, trend) {
+  if (!points || points.length < 2) return '';
+  const vals = points.map(p => p.actual_value);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max - min) || 1;
+  const w = 80, h = 24, step = w / (points.length - 1);
+  const coords = vals.map((v, i) => {
+    const x = (i * step).toFixed(1);
+    const y = (h - ((v - min) / range) * h).toFixed(1);
+    return `${x},${y}`;
+  }).join(' ');
+  const color = trend === 'up' ? 'var(--teal)' : trend === 'down' ? 'var(--coral)' : 'var(--text-faint)';
+  return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${coords}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
 /* ---------------- INDICATORS PANEL ---------------- */
 async function loadIndicators() {
   const grid = document.getElementById('indicatorsGrid');
   try {
-    const { data: indicators, error: indErr } = await supabase
+    const { data: indicatorsRaw, error: indErr } = await supabase
       .from('indicators')
       .select('*')
       .order('name_pt');
     if (indErr) throw indErr;
+    // BCB_USDBRL e IBOV são referências de mercado usadas nos cálculos, não indicadores em si
+    const indicators = (indicatorsRaw || []).filter(i => i.code !== 'BCB_USDBRL' && i.code !== 'IBOV');
 
     if (!indicators || indicators.length === 0) {
       grid.innerHTML = '<p class="empty-note">Nenhum indicador ainda. O robô de coleta roda todo dia às 9h — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
       return;
     }
 
-    const { data: releases, error: relErr } = await supabase
-      .from('indicator_releases')
-      .select('*')
-      .order('release_date', { ascending: false });
-    if (relErr) throw relErr;
+    const releasesByIndicator = {};
+    await Promise.all(indicators.map(async (ind) => {
+      const { data } = await supabase
+        .from('indicator_releases')
+        .select('*')
+        .eq('indicator_id', ind.id)
+        .order('release_date', { ascending: false })
+        .limit(12);
+      releasesByIndicator[ind.id] = (data || []).reverse(); // volta pra ordem crescente
+    }));
+
+    const { data: statsRows } = await supabase.from('indicator_stats').select('*');
+    const statsMap = {};
+    (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
+
+    function readout(pctUp) {
+      if (pctUp === null || pctUp === undefined) return { arrow: '—', label: 'sem dado', cls: 'flat', pct: '—' };
+      if (pctUp >= 50) return { arrow: '▲', label: 'tende a SUBIR', cls: 'up', pct: pctUp };
+      return { arrow: '▼', label: 'tende a CAIR', cls: 'down', pct: Math.round((100 - pctUp) * 10) / 10 };
+    }
+
+    function scenarioRow(scenarioLabel, pctUsd, pctIbov) {
+      const wdo = readout(pctUsd);
+      const win = readout(pctIbov);
+      return `
+        <div class="scenario-row">
+          <span class="scenario-label">${scenarioLabel}</span>
+          <span class="scenario-asset"><b>WDO</b> <span class="arrow ${wdo.cls}">${wdo.arrow}</span> ${wdo.label} <b>${wdo.pct}%</b></span>
+          <span class="scenario-asset"><b>WIN</b> <span class="arrow ${win.cls}">${win.arrow}</span> ${win.label} <b>${win.pct}%</b></span>
+        </div>`;
+    }
+
+    function statsPanel(ind) {
+      const s = statsMap[ind.id];
+      if (!s) {
+        return `<details class="ind-stats"><summary>Ver probabilidade histórica</summary>
+          <p class="stats-empty">Ainda sem amostra suficiente pra esse indicador.</p></details>`;
+      }
+      return `<details class="ind-stats"><summary>Ver probabilidade histórica (${s.sample_size} divulgações)</summary>
+        ${scenarioRow('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up)}
+        ${scenarioRow('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down)}
+        <p class="stats-period">Baseado no histórico de ${fmtDate(s.first_date)} até ${fmtDate(s.last_date)}. WIN estimado via Ibovespa (proxy gratuito). Não é garantia de repetição — é o que aconteceu no passado.</p>
+      </details>`;
+    }
 
     grid.innerHTML = '';
     indicators.forEach(ind => {
-      const rel = releases.find(r => r.indicator_id === ind.id);
+      const indReleases = releasesByIndicator[ind.id] || [];
+      const rel = indReleases[indReleases.length - 1];
+      const flag = countryFlag(ind.country);
       const card = document.createElement('div');
       card.className = 'ind-card';
+      card.dataset.importance = ind.importance || 1;
 
       if (!rel) {
         card.innerHTML = `
           <div class="ind-card-top">
-            <div><div class="ind-name">${ind.name_pt}</div><div class="ind-code">${ind.code}</div></div>
+            <div><div class="ind-name">${flag} ${ind.name_pt}</div><div class="ind-code">${ind.code}</div></div>
           </div>
           <p class="ind-desc">${ind.description_pt || ''}</p>
           <p class="ind-date">Sem divulgação registrada ainda</p>`;
@@ -136,19 +201,23 @@ async function loadIndicators() {
       const trend = trendClass(rel.actual_value, rel.previous_value);
       const mag = pctMagnitude(rel.actual_value, rel.previous_value);
       const badgeText = trend === 'up' ? '▲ subiu' : trend === 'down' ? '▼ caiu' : '— estável';
+      const spark = sparklineSvg(indReleases, trend);
+      card.dataset.importance = ind.importance || 1;
 
       card.innerHTML = `
         <div class="ind-card-top">
-          <div><div class="ind-name">${ind.name_pt}</div><div class="ind-code">${ind.code} · ${ind.frequency || ''}</div></div>
+          <div><div class="ind-name">${flag} ${ind.name_pt}</div><div class="ind-code">${ind.code} · ${ind.frequency || ''} <span class="star-badge">${starRating(ind.importance)}</span></div></div>
           <span class="ind-badge ${trend}">${badgeText}</span>
         </div>
         <div class="ind-values">
           <span class="ind-value">${fmtNum(rel.actual_value)}</span>
           <span class="ind-prev">ant. ${fmtNum(rel.previous_value)}</span>
+          ${spark}
         </div>
         <div class="pulse-bar"><div class="pulse-bar-fill ${trend}" style="width:${mag}%"></div></div>
         <p class="ind-desc">${ind.description_pt || ''}</p>
-        <p class="ind-date">Divulgado em ${fmtDate(rel.release_date)}</p>`;
+        <p class="ind-date">Divulgado em ${fmtDate(rel.release_date)}</p>
+        ${statsPanel(ind)}`;
       grid.appendChild(card);
     });
   } catch (err) {
@@ -161,12 +230,12 @@ async function loadIndicators() {
 async function loadTimeline() {
   const list = document.getElementById('calendarList');
   try {
-    const { data: indicators } = await supabase.from('indicators').select('id,name_pt');
+    const { data: indicators } = await supabase.from('indicators').select('id,name_pt,country');
     const { data: releases, error } = await supabase
       .from('indicator_releases')
       .select('*')
       .order('release_date', { ascending: false })
-      .limit(40);
+      .limit(80);
     if (error) throw error;
 
     if (!releases || releases.length === 0) {
@@ -174,25 +243,28 @@ async function loadTimeline() {
       return;
     }
 
-    const nameMap = {};
-    (indicators || []).forEach(i => nameMap[i.id] = i.name_pt);
+    const indMap = {};
+    (indicators || []).forEach(i => indMap[i.id] = i);
 
     let html = '';
-    let currentMonth = '';
+    let currentDay = '';
     releases.forEach(rel => {
-      const m = monthLabel(rel.release_date);
-      if (m !== currentMonth) {
-        html += `<div class="tl-month">${m}</div>`;
-        currentMonth = m;
+      const ind = indMap[rel.indicator_id] || {};
+      const dayKey = rel.release_date;
+      if (dayKey !== currentDay) {
+        const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(dayKey + 'T12:00:00'));
+        html += `<div class="tl-month">${weekday}</div>`;
+        currentDay = dayKey;
       }
       const trend = trendClass(rel.actual_value, rel.previous_value);
+      const flag = countryFlag(ind.country);
       html += `
         <div class="tl-row">
-          <span class="tl-date">${fmtDate(rel.release_date)}</span>
+          <span class="tl-date">${flag}</span>
           <span class="tl-dot ${trend}"></span>
           <div class="tl-body">
-            <div class="tl-name">${nameMap[rel.indicator_id] || 'Indicador'}</div>
-            <div class="tl-vals">${fmtNum(rel.actual_value)} <span style="opacity:.6">(ant. ${fmtNum(rel.previous_value)})</span></div>
+            <div class="tl-name">${ind.name_pt || 'Indicador'}</div>
+            <div class="tl-vals">Real: ${fmtNum(rel.actual_value)} <span style="opacity:.6">· Anterior: ${fmtNum(rel.previous_value)}</span></div>
           </div>
         </div>`;
     });
@@ -203,225 +275,36 @@ async function loadTimeline() {
   }
 }
 
-/* ---------------- RESUMO DO DIA ---------------- */
-// Séries que representam o próprio mercado (não são "sinal" — são o alvo que
-// medimos). Ficam de fora da lista de indicadores do dia.
-const MARKET_CODES = ['BCB_USDBRL', 'IBOV'];
-
-async function loadDaySummary(dateStr) {
-  const box = document.getElementById('daySummaryContent');
-  box.innerHTML = '<div class="skeleton-card"></div>';
-  try {
-    const { data: indicators, error: indErr } = await supabase.from('indicators').select('*');
-    if (indErr) throw indErr;
-    const indMap = {};
-    (indicators || []).forEach(i => indMap[i.id] = i);
-    const signalIds = new Set((indicators || []).filter(i => !MARKET_CODES.includes(i.code)).map(i => i.id));
-
-    const { data: releases, error: relErr } = await supabase
-      .from('indicator_releases')
-      .select('*')
-      .eq('release_date', dateStr);
-    if (relErr) throw relErr;
-
-    const dayReleases = (releases || []).filter(r => signalIds.has(r.indicator_id));
-
-    let statsMap = {};
-    try {
-      const { data: stats } = await supabase.from('indicator_stats').select('*');
-      (stats || []).forEach(s => statsMap[s.indicator_id] = s);
-    } catch { /* tabela pode ainda não existir — segue sem estatística */ }
-
-    const usdInd = (indicators || []).find(i => i.code === 'BCB_USDBRL');
-    const usdRelease = usdInd ? (releases || []).find(r => r.indicator_id === usdInd.id) || null : null;
-
-    renderDaySummary(dateStr, dayReleases, indMap, statsMap, usdRelease);
-  } catch (err) {
-    console.error(err);
-    box.innerHTML = '<p class="empty-note">Não consegui carregar o resumo desse dia.</p>';
-  }
-}
-
-function renderDaySummary(dateStr, dayReleases, indMap, statsMap, usdRelease) {
-  const box = document.getElementById('daySummaryContent');
-
-  if (dayReleases.length === 0) {
-    box.innerHTML = `<div class="empty-state">
-      <h3>Nenhum indicador divulgado nesse dia</h3>
-      <p>Tente outra data — divulgações concentram em dias úteis, geralmente no início/meio do mês. Use as setas pra navegar rápido.</p>
-    </div>`;
-    return;
-  }
-
-  let weightedSum = 0, weightTotal = 0;
-  const rowsHtml = dayReleases.map(r => {
-    const ind = indMap[r.indicator_id];
-    const trend = trendClass(r.actual_value, r.previous_value);
-    const stat = statsMap[r.indicator_id];
-    let prob = null, sample = 0;
-    if (stat && trend !== 'flat') {
-      prob = trend === 'up' ? stat.pct_usd_up_after_indicator_up : stat.pct_usd_up_after_indicator_down;
-      sample = stat.sample_size || 0;
-    }
-    if (prob !== null && sample >= 5) { weightedSum += prob * sample; weightTotal += sample; }
-
-    const probText = (prob !== null && sample >= 5)
-      ? `Historicamente, o USD sobe em <strong>${prob}%</strong> dos casos após esse padrão (amostra: ${sample} divulgações)`
-      : 'Amostra histórica ainda insuficiente pra esse indicador';
-
-    return `<div class="day-ind-row">
-      <span class="tl-dot ${trend}"></span>
-      <div class="day-ind-body">
-        <div class="tl-name">${ind ? ind.name_pt : 'Indicador'}</div>
-        <div class="ind-values" style="margin:2px 0 4px">
-          <span class="ind-value" style="font-size:15px">${fmtNum(r.actual_value)}</span>
-          <span class="ind-prev">ant. ${fmtNum(r.previous_value)}</span>
-        </div>
-        <div class="day-ind-prob">${probText}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  const aggProb = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null;
-
-  const aggHtml = aggProb !== null
-    ? `<div class="day-agg-card">
-        <div class="day-agg-value ${aggProb >= 50 ? 'pos' : 'neg'}">${aggProb}%</div>
-        <div class="day-agg-label">probabilidade histórica agregada de <strong>alta do dólar</strong> nesse dia, combinando ${dayReleases.length} indicador(es). Isso é estatística do passado — não uma previsão.</div>
-      </div>`
-    : `<div class="day-agg-card"><div class="day-agg-label">Amostra histórica ainda insuficiente pra agregar uma probabilidade confiável nesse dia.</div></div>`;
-
-  let retroHtml = '';
-  if (usdRelease) {
-    const actualTrend = trendClass(usdRelease.actual_value, usdRelease.previous_value);
-    if (actualTrend !== 'flat' && aggProb !== null) {
-      const predictedUp = aggProb >= 50;
-      const actualUp = actualTrend === 'up';
-      const hit = predictedUp === actualUp;
-      retroHtml = `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">
-        ${hit ? '✅' : '❌'} Nesse dia, o dólar de fato <strong>${actualUp ? 'subiu' : 'caiu'}</strong>
-        (${fmtNum(usdRelease.actual_value)} vs. ${fmtNum(usdRelease.previous_value)}) —
-        ${hit ? 'bateu com a probabilidade histórica agregada.' : 'não bateu com a probabilidade histórica agregada.'}
-      </div>`;
-    } else if (actualTrend === 'flat') {
-      retroHtml = `<div class="retro-banner retro-pending">O dólar fechou estável nesse dia.</div>`;
-    }
-  } else {
-    const isFuture = dateStr > todayStrBR();
-    retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem dado de fechamento do dólar coletado pra essa data ainda (pode ser fim de semana, feriado, ou o robô ainda não rodou).'}</div>`;
-  }
-
-  box.innerHTML = aggHtml + retroHtml + `<div class="day-ind-list">${rowsHtml}</div>`;
-}
-
-function wireDayNav() {
-  const dayInput = document.getElementById('daySummaryDate');
-  dayInput.value = todayStrBR();
-
-  function shiftDay(delta) {
-    const d = new Date(dayInput.value + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    dayInput.value = d.toISOString().slice(0, 10);
-    loadDaySummary(dayInput.value);
-  }
-
-  dayInput.addEventListener('change', () => loadDaySummary(dayInput.value));
-  document.getElementById('dayPrev').addEventListener('click', () => shiftDay(-1));
-  document.getElementById('dayNext').addEventListener('click', () => shiftDay(1));
-  document.getElementById('dayToday').addEventListener('click', () => {
-    dayInput.value = todayStrBR();
-    loadDaySummary(dayInput.value);
-  });
-}
-
-/* ---------------- RADAR (geopolítico + notícias overnight) ---------------- */
-async function loadRadar() {
-  const box = document.getElementById('radarContent');
-  const labelMap = { GEO_BRASIL: 'Brasil', GEO_EUA: 'EUA', GEO_ZONA_EURO: 'Zona do Euro' };
+/* ---------------- RADAR: NOTÍCIAS DA MADRUGADA ---------------- */
+async function loadOvernightNews() {
+  const list = document.getElementById('newsList');
   try {
     const { data, error } = await supabase
-      .from('correlated_assets')
+      .from('news')
       .select('*')
-      .like('asset_code', 'GEO_%')
-      .order('ts', { ascending: false });
+      .eq('region', 'overnight')
+      .order('published_at', { ascending: false });
     if (error) throw error;
 
-    const latestByCode = {};
-    (data || []).forEach(r => { if (!latestByCode[r.asset_code]) latestByCode[r.asset_code] = r; });
-    const codes = Object.keys(latestByCode);
-
-    let html = '';
-    if (codes.length === 0) {
-      html = `<div class="empty-state">
-        <h3>Ainda sem sinal</h3>
-        <p>A coleta do radar geopolítico roda automaticamente todo dia. Se acabou de configurar, rode o workflow "fetch-geo" manualmente no GitHub Actions pra popular a primeira leitura.</p>
-      </div>`;
-    } else {
-      html += '<div class="card-grid">' + codes.map(code => {
-        const r = latestByCode[code];
-        const val = Math.round(r.value);
-        const level = val >= 60 ? 'risk-high' : val >= 30 ? 'risk-mid' : 'risk-low';
-        return `<div class="ind-card">
-          <div class="ind-card-top"><div class="ind-name">${labelMap[code] || code}</div></div>
-          <div class="pulse-bar"><div class="pulse-bar-fill ${level}" style="width:${val}%"></div></div>
-          <p class="ind-desc">Nível de tensão: <strong>${val}/100</strong>, baseado em manchetes recentes (proxy, não é medição oficial).</p>
-        </div>`;
-      }).join('') + '</div>';
-    }
-
-    const { data: news } = await supabase
-      .from('news').select('*').eq('region', 'overnight')
-      .order('published_at', { ascending: false }).limit(15);
-
-    if (news && news.length > 0) {
-      html += '<h2 class="section-subhead">Enquanto o Brasil dormia</h2><div class="journal-list">' +
-        news.map(n => `
-          <div class="j-row">
-            <div class="j-info">
-              <div class="j-reason"><a href="${n.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${n.title}</a></div>
-              <div class="j-time">${n.source}</div>
-            </div>
-          </div>`).join('') + '</div>';
-    }
-
-    box.innerHTML = html;
-  } catch (err) {
-    console.error(err);
-    box.innerHTML = '<p class="empty-note">Não consegui carregar o radar agora.</p>';
-  }
-}
-
-/* ---------------- UPCOMING (próximos eventos) ---------------- */
-async function loadUpcoming() {
-  const box = document.getElementById('upcomingList');
-  try {
-    const today = todayStrBR();
-    const { data: schedule, error } = await supabase
-      .from('release_schedule')
-      .select('*')
-      .gte('release_date', today)
-      .order('release_date', { ascending: true })
-      .limit(30);
-    if (error) throw error;
-
-    if (!schedule || schedule.length === 0) {
-      box.innerHTML = '<p class="empty-note">Nenhum evento futuro agendado ainda — rode o workflow "fetch-release-calendar" no GitHub Actions.</p>';
+    if (!data || data.length === 0) {
+      list.innerHTML = '<p class="empty-note">Nenhuma notícia registrada na última varredura (18h–8h). O robô roda todo dia às 8h — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
       return;
     }
 
-    const { data: indicators } = await supabase.from('indicators').select('id,name_pt');
-    const nameMap = {};
-    (indicators || []).forEach(i => nameMap[i.id] = i.name_pt);
-
-    box.innerHTML = schedule.map(s => `
-      <div class="tl-row">
-        <span class="tl-date">${fmtDate(s.release_date)}</span>
-        <span class="upcoming-badge">agendado</span>
-        <div class="tl-body"><div class="tl-name">${nameMap[s.indicator_id] || 'Indicador'}</div></div>
-      </div>`).join('');
+    list.innerHTML = data.map(n => {
+      const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date(n.published_at));
+      return `
+        <a class="news-row" href="${n.url}" target="_blank" rel="noopener">
+          <span class="news-time">${time}</span>
+          <div class="news-body">
+            <div class="news-title">${n.title}</div>
+            <div class="news-source">${n.source}</div>
+          </div>
+        </a>`;
+    }).join('');
   } catch (err) {
     console.error(err);
-    box.innerHTML = '<p class="empty-note">Não consegui carregar a agenda futura agora.</p>';
+    list.innerHTML = '<p class="empty-note">Não consegui carregar as notícias agora.</p>';
   }
 }
 
@@ -433,12 +316,14 @@ form.addEventListener('submit', async (e) => {
   e.preventDefault();
   statusEl.textContent = 'Salvando…';
 
+  const exitTimeVal = document.getElementById('tf-exit-time').value;
   const payload = {
     asset: document.getElementById('tf-asset').value,
-    trade_time: new Date(document.getElementById('tf-time').value).toISOString(),
-    entry_reason: document.getElementById('tf-reason').value || null,
+    trade_time: new Date(document.getElementById('tf-entry-time').value).toISOString(),
+    price: document.getElementById('tf-entry-price').value ? parseFloat(document.getElementById('tf-entry-price').value) : null,
+    exit_price: document.getElementById('tf-exit-price').value ? parseFloat(document.getElementById('tf-exit-price').value) : null,
+    exit_time: exitTimeVal ? new Date(exitTimeVal).toISOString() : null,
     result: document.getElementById('tf-result').value ? parseFloat(document.getElementById('tf-result').value) : null,
-    notes: document.getElementById('tf-notes').value || null,
   };
 
   const { error } = await supabase.from('trade_journal').insert(payload);
@@ -455,7 +340,7 @@ form.addEventListener('submit', async (e) => {
 
 // Default the datetime field to "now" in local time
 (function setDefaultTime() {
-  const el = document.getElementById('tf-time');
+  const el = document.getElementById('tf-entry-time');
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   el.value = now.toISOString().slice(0, 16);
@@ -490,28 +375,381 @@ async function loadJournal() {
     listEl.innerHTML = data.map(t => {
       const r = t.result;
       const rClass = r > 0 ? 'pos' : r < 0 ? 'neg' : '';
-      const time = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(t.trade_time));
+      const entryTime = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(t.trade_time));
+      const exitTime = t.exit_time ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(t.exit_time)) : null;
+      const entryTxt = `Entrada: ${entryTime}${t.price !== null && t.price !== undefined ? ` @ ${fmtNum(t.price)}` : ''}`;
+      const exitTxt = exitTime ? ` · Saída: ${exitTime}${t.exit_price !== null && t.exit_price !== undefined ? ` @ ${fmtNum(t.exit_price)}` : ''}` : '';
       return `
         <div class="j-row">
           <span class="j-asset">${t.asset}</span>
           <div class="j-info">
-            <div class="j-reason">${t.entry_reason || 'Sem descrição'}</div>
-            <div class="j-time">${time}</div>
+            <div class="j-reason">${entryTxt}${exitTxt}</div>
           </div>
           <span class="j-result ${rClass}">${r === null ? '—' : (r >= 0 ? '+' : '') + fmtNum(r)}</span>
         </div>`;
     }).join('');
+
+    renderWeeklySummary(data);
   } catch (err) {
     console.error(err);
     listEl.innerHTML = '<p class="empty-note">Não consegui carregar o diário agora.</p>';
   }
 }
 
+/* ---------------- RESUMO SEMANAL ---------------- */
+function isoWeekKey(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-S${String(weekNo).padStart(2, '0')}`;
+}
+
+function renderWeeklySummary(allTrades) {
+  const el = document.getElementById('weeklySummary');
+  if (!allTrades || allTrades.length === 0) {
+    el.innerHTML = '<p class="empty-note">Sem operações suficientes ainda pra montar o resumo semanal.</p>';
+    return;
+  }
+  const weeks = {};
+  allTrades.forEach(t => {
+    const key = isoWeekKey(new Date(t.trade_time));
+    if (!weeks[key]) weeks[key] = { total: 0, count: 0, wins: 0 };
+    weeks[key].total += (t.result || 0);
+    weeks[key].count += 1;
+    if ((t.result || 0) > 0) weeks[key].wins += 1;
+  });
+  const sortedKeys = Object.keys(weeks).sort().reverse().slice(0, 6);
+
+  el.innerHTML = sortedKeys.map(key => {
+    const w = weeks[key];
+    const winRate = Math.round((w.wins / w.count) * 100);
+    const cls = w.total >= 0 ? 'pos' : 'neg';
+    return `
+      <div class="week-row">
+        <span class="week-label">${key}</span>
+        <span class="week-count">${w.count} op.</span>
+        <span class="week-winrate">${winRate}% acerto</span>
+        <span class="week-total ${cls}">${w.total >= 0 ? '+' : ''}${fmtNum(w.total)}</span>
+      </div>`;
+  }).join('');
+}
+
+/* ---------------- RESUMO DO DIA (com navegação histórica) ---------------- */
+function scenarioLine(scenarioLabel, pctUsd, pctIbov) {
+  function readoutInline(pctUp) {
+    if (pctUp === null || pctUp === undefined) return '—';
+    if (pctUp >= 50) return `<span class="arrow up">▲</span> SOBE ${pctUp}%`;
+    return `<span class="arrow down">▼</span> CAI ${Math.round((100 - pctUp) * 10) / 10}%`;
+  }
+  return `<div class="summary-scenario"><b>${scenarioLabel}</b>: WDO ${readoutInline(pctUsd)} · WIN ${readoutInline(pctIbov)}</div>`;
+}
+
+async function loadDailySummary(dateStr) {
+  dateStr = dateStr || todayStrBR();
+  const head = document.getElementById('dailySummaryHead');
+  const retroEl = document.getElementById('dailySummaryRetro');
+  const itemsEl = document.getElementById('dailySummaryItems');
+  const isToday = dateStr === todayStrBR();
+  const dateLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(dateStr + 'T12:00:00'));
+
+  retroEl.innerHTML = '';
+  itemsEl.innerHTML = '<p class="stats-empty">Carregando…</p>';
+
+  try {
+    const { data: scheduled, error } = await supabase
+      .from('release_schedule')
+      .select('indicator_id')
+      .eq('release_date', dateStr);
+    if (error) throw error;
+
+    if (!scheduled || scheduled.length === 0) {
+      head.textContent = `Resumo de ${isToday ? 'hoje' : 'dia'} (${dateLabel}): nenhum indicador de alto impacto programado`;
+      itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
+      return;
+    }
+
+    const ids = scheduled.map(s => s.indicator_id);
+    const { data: indicators } = await supabase.from('indicators').select('*').in('id', ids);
+    const { data: statsRows } = await supabase.from('indicator_stats').select('*').in('indicator_id', ids);
+    const statsMap = {};
+    (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
+
+    // Pra cada indicador, pega a divulgação mais próxima na data ou antes dela (o dado mensal não
+    // costuma bater com o dia exato do anúncio — ver aviso na aba Calendário)
+    const releaseByIndicator = {};
+    await Promise.all(ids.map(async (id) => {
+      const { data } = await supabase
+        .from('indicator_releases')
+        .select('*')
+        .eq('indicator_id', id)
+        .lte('release_date', dateStr)
+        .order('release_date', { ascending: false })
+        .limit(1);
+      if (data && data.length) releaseByIndicator[id] = data[0];
+    }));
+
+    const sorted = (indicators || []).sort((a, b) => (b.importance || 1) - (a.importance || 1));
+
+    head.textContent = `Resumo de ${isToday ? 'hoje' : 'dia'} (${dateLabel}): ${sorted.length} indicador(es) programado(s)`;
+
+    let weightedSum = 0, weightTotal = 0;
+    itemsEl.innerHTML = sorted.map(ind => {
+      const s = statsMap[ind.id];
+      const flag = countryFlag(ind.country);
+      const time = ind.typical_time_brt ? ` · por volta das ${ind.typical_time_brt}` : '';
+      const rel = releaseByIndicator[ind.id];
+      const trend = rel ? trendClass(rel.actual_value, rel.previous_value) : 'flat';
+
+      if (s && trend !== 'flat') {
+        const prob = trend === 'up' ? s.pct_usd_up_after_indicator_up : s.pct_usd_up_after_indicator_down;
+        if (prob !== null && prob !== undefined && (s.sample_size || 0) >= 5) {
+          weightedSum += prob * s.sample_size;
+          weightTotal += s.sample_size;
+        }
+      }
+
+      const scenarios = s
+        ? scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up) +
+          scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down)
+        : '<p class="stats-empty">Sem amostra histórica suficiente ainda.</p>';
+      return `
+        <div class="summary-item">
+          <div class="summary-item-head">${flag} <b>${ind.name_pt}</b> <span class="star-badge">${starRating(ind.importance)}</span>${time}</div>
+          ${scenarios}
+        </div>`;
+    }).join('');
+
+    /* Probabilidade agregada + conferência retroativa */
+    const aggProb = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null;
+
+    let usdIndId = null;
+    try {
+      const { data: usdInd } = await supabase.from('indicators').select('id').eq('code', 'BCB_USDBRL').maybeSingle();
+      usdIndId = usdInd ? usdInd.id : null;
+    } catch { /* segue sem conferência retroativa se não achar */ }
+
+    let usdRelease = null;
+    if (usdIndId) {
+      const { data: usdRows } = await supabase
+        .from('indicator_releases')
+        .select('*')
+        .eq('indicator_id', usdIndId)
+        .eq('release_date', dateStr)
+        .limit(1);
+      usdRelease = usdRows && usdRows[0] ? usdRows[0] : null;
+    }
+
+    let retroHtml = '';
+    if (aggProb !== null) {
+      retroHtml += `<div class="scenario-row" style="margin-bottom:10px">
+        <span class="scenario-label">Probabilidade histórica agregada do dia</span>
+        <span class="scenario-asset"><b>${aggProb}%</b> de chance histórica de alta do dólar nesse dia, combinando os indicadores acima — estatística do passado, não previsão.</span>
+      </div>`;
+    }
+    if (usdRelease) {
+      const actualTrend = trendClass(usdRelease.actual_value, usdRelease.previous_value);
+      if (actualTrend !== 'flat' && aggProb !== null) {
+        const predictedUp = aggProb >= 50;
+        const actualUp = actualTrend === 'up';
+        const hit = predictedUp === actualUp;
+        retroHtml += `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">
+          ${hit ? '✅' : '❌'} Nesse dia, o dólar de fato <b>${actualUp ? 'subiu' : 'caiu'}</b>
+          (${fmtNum(usdRelease.actual_value)} vs. ${fmtNum(usdRelease.previous_value)}) —
+          ${hit ? 'bateu' : 'não bateu'} com a probabilidade histórica agregada.
+        </div>`;
+      } else if (actualTrend === 'flat') {
+        retroHtml += `<div class="retro-banner retro-pending">O dólar fechou estável nesse dia.</div>`;
+      }
+    } else {
+      const isFuture = dateStr > todayStrBR();
+      retroHtml += `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem dado de fechamento do dólar coletado pra essa data ainda (fim de semana, feriado, ou o robô ainda não rodou).'}</div>`;
+    }
+    retroEl.innerHTML = retroHtml;
+  } catch (err) {
+    console.error(err);
+    head.textContent = 'Resumo do dia: não consegui carregar agora';
+  }
+}
+
+function wireDailyDateNav() {
+  const dayInput = document.getElementById('daySummaryDate');
+  dayInput.value = todayStrBR();
+
+  function shiftDay(delta) {
+    const d = new Date(dayInput.value + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    dayInput.value = d.toISOString().slice(0, 10);
+    loadDailySummary(dayInput.value);
+  }
+
+  dayInput.addEventListener('change', () => loadDailySummary(dayInput.value));
+  document.getElementById('dayPrev').addEventListener('click', () => shiftDay(-1));
+  document.getElementById('dayNext').addEventListener('click', () => shiftDay(1));
+  document.getElementById('dayToday').addEventListener('click', () => {
+    dayInput.value = todayStrBR();
+    loadDailySummary(dayInput.value);
+  });
+}
+
+/* ---------------- BLOCO DE NOTAS ---------------- */
+let notepadTimer = null;
+async function loadNotepad() {
+  const area = document.getElementById('notepadArea');
+  const status = document.getElementById('notepadStatus');
+  const counter = document.getElementById('notepadCounter');
+  try {
+    const { data, error } = await supabase.from('notepad').select('content').eq('id', 1).single();
+    if (error) throw error;
+    area.value = data?.content || '';
+    counter.textContent = `${area.value.length}/1000`;
+  } catch (err) {
+    console.error(err);
+  }
+  area.addEventListener('input', () => {
+    counter.textContent = `${area.value.length}/1000`;
+    status.textContent = 'digitando…';
+    clearTimeout(notepadTimer);
+    notepadTimer = setTimeout(async () => {
+      status.textContent = 'salvando…';
+      const { error } = await supabase.from('notepad').update({ content: area.value, updated_at: new Date().toISOString() }).eq('id', 1);
+      status.textContent = error ? 'erro ao salvar' : 'salvo ✓';
+      setTimeout(() => { if (status.textContent === 'salvo ✓') status.textContent = ''; }, 2000);
+    }, 900);
+  });
+}
+
+/* ---------------- CALENDÁRIO DE FERIADOS ---------------- */
+function easterDate(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function nthWeekdayOfMonth(year, month, weekday, n) {
+  const first = new Date(year, month, 1);
+  let offset = (weekday - first.getDay() + 7) % 7;
+  return new Date(year, month, 1 + offset + (n - 1) * 7);
+}
+function lastWeekdayOfMonth(year, month, weekday) {
+  const last = new Date(year, month + 1, 0);
+  let offset = (last.getDay() - weekday + 7) % 7;
+  return new Date(year, month, last.getDate() - offset);
+}
+function usObservedDate(date) {
+  if (date.getDay() === 6) return addDays(date, -1);
+  if (date.getDay() === 0) return addDays(date, 1);
+  return date;
+}
+function dstr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+
+function getHolidays(year) {
+  const easter = easterDate(year);
+  const goodFriday = addDays(easter, -2);
+  const carnavalMon = addDays(easter, -48);
+  const carnavalTue = addDays(easter, -47);
+  const corpusChristi = addDays(easter, 60);
+
+  const us = [
+    { d: usObservedDate(new Date(year, 0, 1)), name: "Ano Novo" },
+    { d: nthWeekdayOfMonth(year, 0, 1, 3), name: "Martin Luther King Jr." },
+    { d: nthWeekdayOfMonth(year, 1, 1, 3), name: "Presidents' Day" },
+    { d: goodFriday, name: "Good Friday (mercado de ações)" },
+    { d: lastWeekdayOfMonth(year, 4, 1), name: "Memorial Day" },
+    { d: usObservedDate(new Date(year, 5, 19)), name: "Juneteenth" },
+    { d: usObservedDate(new Date(year, 6, 4)), name: "Independence Day" },
+    { d: nthWeekdayOfMonth(year, 8, 1, 1), name: "Labor Day" },
+    { d: nthWeekdayOfMonth(year, 10, 4, 4), name: "Thanksgiving" },
+    { d: usObservedDate(new Date(year, 11, 25)), name: "Christmas" },
+  ];
+
+  const br = [
+    { d: new Date(year, 0, 1), name: "Confraternização Universal" },
+    { d: carnavalMon, name: "Carnaval (segunda)" },
+    { d: carnavalTue, name: "Carnaval (terça)" },
+    { d: goodFriday, name: "Sexta-feira Santa" },
+    { d: new Date(year, 3, 21), name: "Tiradentes" },
+    { d: new Date(year, 4, 1), name: "Dia do Trabalho" },
+    { d: corpusChristi, name: "Corpus Christi" },
+    { d: new Date(year, 8, 7), name: "Independência do Brasil" },
+    { d: new Date(year, 9, 12), name: "Nossa Sr.ª Aparecida" },
+    { d: new Date(year, 10, 2), name: "Finados" },
+    { d: new Date(year, 10, 15), name: "Proclamação da República" },
+    { d: new Date(year, 10, 20), name: "Consciência Negra" },
+    { d: new Date(year, 11, 25), name: "Natal" },
+  ];
+
+  const map = {};
+  us.forEach(h => { const k = dstr(h.d); (map[k] = map[k] || {}).us = h.name; });
+  br.forEach(h => { const k = dstr(h.d); (map[k] = map[k] || {}).br = h.name; });
+  return map;
+}
+
+let calState = new Date();
+function renderHolidayCalendar() {
+  const el = document.getElementById('holidayCalendar');
+  const year = calState.getFullYear(), month = calState.getMonth();
+  const holidays = getHolidays(year);
+  const monthLabel2 = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(calState);
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const weekDayNames = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
+  let cells = '';
+  for (let i = 0; i < firstDay; i++) cells += `<div class="cal-cell empty"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateObj = new Date(year, month, day);
+    const key = dstr(dateObj);
+    const h = holidays[key];
+    let cls = 'cal-cell';
+    let tag = '';
+    if (h?.br) { cls += ' is-br'; tag += `<span class="cal-tag br" title="${h.br}">BR</span>`; }
+    if (h?.us) { cls += ' is-us'; tag += `<span class="cal-tag us" title="${h.us}">US</span>`; }
+    cells += `<div class="${cls}"><span class="cal-day">${day}</span>${tag}</div>`;
+  }
+
+  el.innerHTML = `
+    <div class="cal-header">
+      <button class="cal-nav" id="calPrev">‹</button>
+      <span class="cal-title">${monthLabel2}</span>
+      <button class="cal-nav" id="calNext">›</button>
+    </div>
+    <div class="cal-grid cal-weekdays">${weekDayNames.map(w => `<div class="cal-wd">${w}</div>`).join('')}</div>
+    <div class="cal-grid">${cells}</div>
+    <div class="cal-legend">
+      <span><span class="cal-tag br">BR</span> B3 fechada</span>
+      <span><span class="cal-tag us">US</span> bolsas dos EUA fechadas</span>
+    </div>`;
+
+  document.getElementById('calPrev').addEventListener('click', () => { calState.setMonth(calState.getMonth() - 1); renderHolidayCalendar(); });
+  document.getElementById('calNext').addEventListener('click', () => { calState.setMonth(calState.getMonth() + 1); renderHolidayCalendar(); });
+}
+
+document.querySelectorAll('#importanceFilter .filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#importanceFilter .filter-btn').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    const min = parseInt(btn.dataset.min, 10);
+    document.querySelectorAll('#indicatorsGrid .ind-card').forEach(card => {
+      const imp = parseInt(card.dataset.importance || '1', 10);
+      card.style.display = imp >= min ? '' : 'none';
+    });
+  });
+});
+
 /* ---------------- INIT ---------------- */
 loadIndicators();
 loadTimeline();
+loadOvernightNews();
 loadJournal();
-wireDayNav();
-loadDaySummary(todayStrBR());
-loadRadar();
-loadUpcoming();
+wireDailyDateNav();
+loadDailySummary(todayStrBR());
+loadNotepad();
+renderHolidayCalendar();
