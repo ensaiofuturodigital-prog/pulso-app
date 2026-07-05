@@ -32,10 +32,15 @@ async function getReleaseDates(releaseId) {
 async function run() {
   console.log('Buscando calendário real de divulgações do FRED...');
 
+  // DFF, DGS10 e DTWEXBGS são séries de mercado contínuas (têm valor todo dia útil),
+  // não divulgações pontuais — não fazem sentido no calendário de "eventos do dia".
+  const CONTINUOUS_SERIES = ['DFF', 'DGS10', 'DTWEXBGS'];
+
   const { data: indicators } = await supabase
     .from('indicators')
     .select('id, code')
-    .eq('source', 'fred');
+    .eq('source', 'fred')
+    .not('code', 'in', `(${CONTINUOUS_SERIES.join(',')})`);
 
   for (const ind of indicators) {
     try {
