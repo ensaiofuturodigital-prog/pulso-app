@@ -25,12 +25,16 @@ const INDICATORS = [
   { code: 'GDPC1', name_pt: 'PIB Real (EUA)', description_pt: 'Crescimento econômico trimestral dos EUA — o dado mais amplo de todos.', frequency: 'quarterly' },
   { code: 'PCEPILFE', name_pt: 'Núcleo do PCE (medida preferida do Fed)', description_pt: 'O indicador de inflação que o próprio Fed diz observar mais de perto.', frequency: 'monthly' },
   { code: 'BOPGSTB', name_pt: 'Balança Comercial (EUA)', description_pt: 'Diferença entre exportações e importações americanas.', frequency: 'monthly' },
+  { code: 'ECBMRRFR', name_pt: 'Taxa de Juros do BCE (Zona do Euro)', description_pt: 'Taxa básica de juros da Zona do Euro, definida pelo Banco Central Europeu. Compete diretamente com o Fed na força do dólar frente ao euro.', frequency: 'event' },
+  { code: 'ECBDFR', name_pt: 'Taxa de Depósito do BCE (Zona do Euro)', description_pt: 'Taxa que o BCE paga aos bancos por depósitos overnight — termômetro extra da política monetária europeia.', frequency: 'event' },
+  { code: 'LRHUTTTTEZM156S', name_pt: 'Taxa de Desemprego - Zona do Euro', description_pt: 'Desemprego na Zona do Euro. Enfraquecimento pode pressionar o BCE a cortar juros, o que tende a fortalecer o dólar frente ao euro.', frequency: 'monthly' },
+  { code: 'CP0000EZ19M086NEST', name_pt: 'Inflação HICP - Zona do Euro', description_pt: 'Inflação oficial da Zona do Euro. Acima do esperado pressiona o BCE a manter ou subir juros.', frequency: 'monthly' },
 ];
 
 // Busca o máximo de histórico que o FRED permitir (cada série tem uma data de início diferente)
 const HISTORY_START = '1995-01-01';
 
-async function fetchFredSeries(code) {
+const EU_CODES = ['ECBMRRFR', 'ECBDFR', 'LRHUTTTTEZM156S', 'CP0000EZ19M086NEST'];
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${code}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${HISTORY_START}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Erro ao buscar ${code}: ${res.status}`);
@@ -52,7 +56,7 @@ async function run() {
       const { data: upserted, error: upsertError } = await supabase
         .from('indicators')
         .upsert(
-          { code: ind.code, name_pt: ind.name_pt, description_pt: ind.description_pt, source: 'fred', country: 'US', frequency: ind.frequency },
+          { code: ind.code, name_pt: ind.name_pt, description_pt: ind.description_pt, source: 'fred', country: EU_CODES.includes(ind.code) ? 'EU' : 'US', frequency: ind.frequency },
           { onConflict: 'code' }
         )
         .select()
