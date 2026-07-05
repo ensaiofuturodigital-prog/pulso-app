@@ -90,6 +90,10 @@ function fmtDate(d) {
 function monthLabel(d) {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(d + 'T12:00:00'));
 }
+function todayStrBR() {
+  // en-CA formata como YYYY-MM-DD, o mesmo formato que o banco usa
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
 
 /* ---------------- INDICATORS PANEL ---------------- */
 async function loadIndicators() {
@@ -199,6 +203,228 @@ async function loadTimeline() {
   }
 }
 
+/* ---------------- RESUMO DO DIA ---------------- */
+// Séries que representam o próprio mercado (não são "sinal" — são o alvo que
+// medimos). Ficam de fora da lista de indicadores do dia.
+const MARKET_CODES = ['BCB_USDBRL', 'IBOV'];
+
+async function loadDaySummary(dateStr) {
+  const box = document.getElementById('daySummaryContent');
+  box.innerHTML = '<div class="skeleton-card"></div>';
+  try {
+    const { data: indicators, error: indErr } = await supabase.from('indicators').select('*');
+    if (indErr) throw indErr;
+    const indMap = {};
+    (indicators || []).forEach(i => indMap[i.id] = i);
+    const signalIds = new Set((indicators || []).filter(i => !MARKET_CODES.includes(i.code)).map(i => i.id));
+
+    const { data: releases, error: relErr } = await supabase
+      .from('indicator_releases')
+      .select('*')
+      .eq('release_date', dateStr);
+    if (relErr) throw relErr;
+
+    const dayReleases = (releases || []).filter(r => signalIds.has(r.indicator_id));
+
+    let statsMap = {};
+    try {
+      const { data: stats } = await supabase.from('indicator_stats').select('*');
+      (stats || []).forEach(s => statsMap[s.indicator_id] = s);
+    } catch { /* tabela pode ainda não existir — segue sem estatística */ }
+
+    const usdInd = (indicators || []).find(i => i.code === 'BCB_USDBRL');
+    const usdRelease = usdInd ? (releases || []).find(r => r.indicator_id === usdInd.id) || null : null;
+
+    renderDaySummary(dateStr, dayReleases, indMap, statsMap, usdRelease);
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = '<p class="empty-note">Não consegui carregar o resumo desse dia.</p>';
+  }
+}
+
+function renderDaySummary(dateStr, dayReleases, indMap, statsMap, usdRelease) {
+  const box = document.getElementById('daySummaryContent');
+
+  if (dayReleases.length === 0) {
+    box.innerHTML = `<div class="empty-state">
+      <h3>Nenhum indicador divulgado nesse dia</h3>
+      <p>Tente outra data — divulgações concentram em dias úteis, geralmente no início/meio do mês. Use as setas pra navegar rápido.</p>
+    </div>`;
+    return;
+  }
+
+  let weightedSum = 0, weightTotal = 0;
+  const rowsHtml = dayReleases.map(r => {
+    const ind = indMap[r.indicator_id];
+    const trend = trendClass(r.actual_value, r.previous_value);
+    const stat = statsMap[r.indicator_id];
+    let prob = null, sample = 0;
+    if (stat && trend !== 'flat') {
+      prob = trend === 'up' ? stat.pct_usd_up_after_indicator_up : stat.pct_usd_up_after_indicator_down;
+      sample = stat.sample_size || 0;
+    }
+    if (prob !== null && sample >= 5) { weightedSum += prob * sample; weightTotal += sample; }
+
+    const probText = (prob !== null && sample >= 5)
+      ? `Historicamente, o USD sobe em <strong>${prob}%</strong> dos casos após esse padrão (amostra: ${sample} divulgações)`
+      : 'Amostra histórica ainda insuficiente pra esse indicador';
+
+    return `<div class="day-ind-row">
+      <span class="tl-dot ${trend}"></span>
+      <div class="day-ind-body">
+        <div class="tl-name">${ind ? ind.name_pt : 'Indicador'}</div>
+        <div class="ind-values" style="margin:2px 0 4px">
+          <span class="ind-value" style="font-size:15px">${fmtNum(r.actual_value)}</span>
+          <span class="ind-prev">ant. ${fmtNum(r.previous_value)}</span>
+        </div>
+        <div class="day-ind-prob">${probText}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const aggProb = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null;
+
+  const aggHtml = aggProb !== null
+    ? `<div class="day-agg-card">
+        <div class="day-agg-value ${aggProb >= 50 ? 'pos' : 'neg'}">${aggProb}%</div>
+        <div class="day-agg-label">probabilidade histórica agregada de <strong>alta do dólar</strong> nesse dia, combinando ${dayReleases.length} indicador(es). Isso é estatística do passado — não uma previsão.</div>
+      </div>`
+    : `<div class="day-agg-card"><div class="day-agg-label">Amostra histórica ainda insuficiente pra agregar uma probabilidade confiável nesse dia.</div></div>`;
+
+  let retroHtml = '';
+  if (usdRelease) {
+    const actualTrend = trendClass(usdRelease.actual_value, usdRelease.previous_value);
+    if (actualTrend !== 'flat' && aggProb !== null) {
+      const predictedUp = aggProb >= 50;
+      const actualUp = actualTrend === 'up';
+      const hit = predictedUp === actualUp;
+      retroHtml = `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">
+        ${hit ? '✅' : '❌'} Nesse dia, o dólar de fato <strong>${actualUp ? 'subiu' : 'caiu'}</strong>
+        (${fmtNum(usdRelease.actual_value)} vs. ${fmtNum(usdRelease.previous_value)}) —
+        ${hit ? 'bateu com a probabilidade histórica agregada.' : 'não bateu com a probabilidade histórica agregada.'}
+      </div>`;
+    } else if (actualTrend === 'flat') {
+      retroHtml = `<div class="retro-banner retro-pending">O dólar fechou estável nesse dia.</div>`;
+    }
+  } else {
+    const isFuture = dateStr > todayStrBR();
+    retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem dado de fechamento do dólar coletado pra essa data ainda (pode ser fim de semana, feriado, ou o robô ainda não rodou).'}</div>`;
+  }
+
+  box.innerHTML = aggHtml + retroHtml + `<div class="day-ind-list">${rowsHtml}</div>`;
+}
+
+function wireDayNav() {
+  const dayInput = document.getElementById('daySummaryDate');
+  dayInput.value = todayStrBR();
+
+  function shiftDay(delta) {
+    const d = new Date(dayInput.value + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    dayInput.value = d.toISOString().slice(0, 10);
+    loadDaySummary(dayInput.value);
+  }
+
+  dayInput.addEventListener('change', () => loadDaySummary(dayInput.value));
+  document.getElementById('dayPrev').addEventListener('click', () => shiftDay(-1));
+  document.getElementById('dayNext').addEventListener('click', () => shiftDay(1));
+  document.getElementById('dayToday').addEventListener('click', () => {
+    dayInput.value = todayStrBR();
+    loadDaySummary(dayInput.value);
+  });
+}
+
+/* ---------------- RADAR (geopolítico + notícias overnight) ---------------- */
+async function loadRadar() {
+  const box = document.getElementById('radarContent');
+  const labelMap = { GEO_BRASIL: 'Brasil', GEO_EUA: 'EUA', GEO_ZONA_EURO: 'Zona do Euro' };
+  try {
+    const { data, error } = await supabase
+      .from('correlated_assets')
+      .select('*')
+      .like('asset_code', 'GEO_%')
+      .order('ts', { ascending: false });
+    if (error) throw error;
+
+    const latestByCode = {};
+    (data || []).forEach(r => { if (!latestByCode[r.asset_code]) latestByCode[r.asset_code] = r; });
+    const codes = Object.keys(latestByCode);
+
+    let html = '';
+    if (codes.length === 0) {
+      html = `<div class="empty-state">
+        <h3>Ainda sem sinal</h3>
+        <p>A coleta do radar geopolítico roda automaticamente todo dia. Se acabou de configurar, rode o workflow "fetch-geo" manualmente no GitHub Actions pra popular a primeira leitura.</p>
+      </div>`;
+    } else {
+      html += '<div class="card-grid">' + codes.map(code => {
+        const r = latestByCode[code];
+        const val = Math.round(r.value);
+        const level = val >= 60 ? 'risk-high' : val >= 30 ? 'risk-mid' : 'risk-low';
+        return `<div class="ind-card">
+          <div class="ind-card-top"><div class="ind-name">${labelMap[code] || code}</div></div>
+          <div class="pulse-bar"><div class="pulse-bar-fill ${level}" style="width:${val}%"></div></div>
+          <p class="ind-desc">Nível de tensão: <strong>${val}/100</strong>, baseado em manchetes recentes (proxy, não é medição oficial).</p>
+        </div>`;
+      }).join('') + '</div>';
+    }
+
+    const { data: news } = await supabase
+      .from('news').select('*').eq('region', 'overnight')
+      .order('published_at', { ascending: false }).limit(15);
+
+    if (news && news.length > 0) {
+      html += '<h2 class="section-subhead">Enquanto o Brasil dormia</h2><div class="journal-list">' +
+        news.map(n => `
+          <div class="j-row">
+            <div class="j-info">
+              <div class="j-reason"><a href="${n.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${n.title}</a></div>
+              <div class="j-time">${n.source}</div>
+            </div>
+          </div>`).join('') + '</div>';
+    }
+
+    box.innerHTML = html;
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = '<p class="empty-note">Não consegui carregar o radar agora.</p>';
+  }
+}
+
+/* ---------------- UPCOMING (próximos eventos) ---------------- */
+async function loadUpcoming() {
+  const box = document.getElementById('upcomingList');
+  try {
+    const today = todayStrBR();
+    const { data: schedule, error } = await supabase
+      .from('release_schedule')
+      .select('*')
+      .gte('release_date', today)
+      .order('release_date', { ascending: true })
+      .limit(30);
+    if (error) throw error;
+
+    if (!schedule || schedule.length === 0) {
+      box.innerHTML = '<p class="empty-note">Nenhum evento futuro agendado ainda — rode o workflow "fetch-release-calendar" no GitHub Actions.</p>';
+      return;
+    }
+
+    const { data: indicators } = await supabase.from('indicators').select('id,name_pt');
+    const nameMap = {};
+    (indicators || []).forEach(i => nameMap[i.id] = i.name_pt);
+
+    box.innerHTML = schedule.map(s => `
+      <div class="tl-row">
+        <span class="tl-date">${fmtDate(s.release_date)}</span>
+        <span class="upcoming-badge">agendado</span>
+        <div class="tl-body"><div class="tl-name">${nameMap[s.indicator_id] || 'Indicador'}</div></div>
+      </div>`).join('');
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = '<p class="empty-note">Não consegui carregar a agenda futura agora.</p>';
+  }
+}
+
 /* ---------------- TRADE JOURNAL ---------------- */
 const form = document.getElementById('tradeForm');
 const statusEl = document.getElementById('formStatus');
@@ -285,3 +511,7 @@ async function loadJournal() {
 loadIndicators();
 loadTimeline();
 loadJournal();
+wireDayNav();
+loadDaySummary(todayStrBR());
+loadRadar();
+loadUpcoming();

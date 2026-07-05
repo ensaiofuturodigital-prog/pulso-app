@@ -46,6 +46,10 @@
         <svg viewBox="0 0 24 24"><path d="M4 19V10M12 19V5M20 19V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Painel</span>
       </button>
+      <button class="tab-btn" data-tab="resumo">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M9 9h.01M15 15h.01M15.5 8.5l-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Resumo</span>
+      </button>
       <button class="tab-btn" data-tab="calendario">
         <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3.5 9.5H20.5M8 3V6M16 3V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Calendário</span>
@@ -76,12 +80,38 @@
         </div>
       </section>
 
+      <!-- RESUMO DO DIA -->
+      <section class="panel" id="panel-resumo">
+        <div class="panel-head">
+          <h1>Resumo do dia</h1>
+          <p>Probabilidade histórica agregada dos indicadores divulgados numa data — <em>estatística do passado, não recomendação de operação</em>. Navegue por qualquer dia disponível, inclusive datas antigas, pra estudar o que aconteceu.</p>
+        </div>
+
+        <div class="date-nav">
+          <button class="date-nav-btn" id="dayPrev" type="button" aria-label="Dia anterior">‹</button>
+          <input type="date" id="daySummaryDate" class="date-input">
+          <button class="date-nav-btn" id="dayNext" type="button" aria-label="Próximo dia">›</button>
+          <button class="date-nav-btn date-today" id="dayToday" type="button">Hoje</button>
+        </div>
+
+        <div id="daySummaryContent">
+          <div class="skeleton-card"></div>
+        </div>
+      </section>
+
       <!-- CALENDARIO -->
       <section class="panel" id="panel-calendario">
         <div class="panel-head">
-          <h1>Histórico de divulgações</h1>
-          <p>Últimas divulgações registradas por indicador. Um calendário de <em>próximos</em> eventos com consenso de mercado ainda não está conectado.</p>
+          <h1>Calendário</h1>
+          <p>Próximos eventos agendados (calendário oficial do FRED) e histórico de divulgações já registradas.</p>
         </div>
+
+        <h2 class="section-subhead">Próximos eventos</h2>
+        <div class="timeline" id="upcomingList">
+          <p class="empty-note">Carregando agenda…</p>
+        </div>
+
+        <h2 class="section-subhead">Histórico</h2>
         <div class="timeline" id="calendarList">
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
@@ -94,10 +124,8 @@
           <h1>Radar geopolítico</h1>
           <p>Medidor de tensão por região, baseado em cobertura noticiosa.</p>
         </div>
-        <div class="empty-state">
-          <svg viewBox="0 0 24 24" width="34" height="34"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
-          <h3>Ainda sem sinal</h3>
-          <p>A coleta de dados geopolíticos (GDELT + notícias de alto impacto) é a próxima peça do pipeline. Quando estiver ativa, cada região aparece aqui com uma barra de tensão, igual à dos indicadores.</p>
+        <div id="radarContent">
+          <div class="skeleton-card"></div>
         </div>
       </section>
 
