@@ -101,6 +101,11 @@ function starRating(n) {
   const stars = n || 1;
   return '★'.repeat(stars) + '☆'.repeat(3 - stars);
 }
+function confidenceLabel(sampleSize) {
+  if (sampleSize >= 30) return { text: 'Confiança alta', cls: 'conf-high' };
+  if (sampleSize >= 12) return { text: 'Confiança média', cls: 'conf-mid' };
+  return { text: 'Confiança baixa — usar com cautela', cls: 'conf-low' };
+}
 function sparklineSvg(points, trend) {
   if (!points || points.length < 2) return '';
   const vals = points.map(p => p.actual_value);
@@ -171,7 +176,9 @@ async function loadIndicators() {
         return `<details class="ind-stats"><summary>Ver probabilidade histórica</summary>
           <p class="stats-empty">Ainda sem amostra suficiente pra esse indicador.</p></details>`;
       }
+      const conf = confidenceLabel(s.sample_size);
       return `<details class="ind-stats"><summary>Ver probabilidade histórica (${s.sample_size} divulgações)</summary>
+        <span class="conf-badge ${conf.cls}">${conf.text}</span>
         ${scenarioRow('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up)}
         ${scenarioRow('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down)}
         <p class="stats-period">Baseado no histórico de ${fmtDate(s.first_date)} até ${fmtDate(s.last_date)}. WIN estimado via Ibovespa (proxy gratuito). Não é garantia de repetição — é o que aconteceu no passado.</p>
@@ -511,7 +518,8 @@ async function loadDailySummary(dateStr) {
       }
 
       const scenarios = s
-        ? scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up) +
+        ? `<span class="conf-badge ${confidenceLabel(s.sample_size).cls}">${confidenceLabel(s.sample_size).text} · ${s.sample_size} divulgações</span>` +
+          scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up) +
           scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down)
         : '<p class="stats-empty">Sem amostra histórica suficiente ainda.</p>';
       return `
@@ -753,3 +761,10 @@ wireDailyDateNav();
 loadDailySummary(todayStrBR());
 loadNotepad();
 renderHolidayCalendar();
+
+/* ---------------- PWA: registra o service worker ---------------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.error('SW falhou:', err));
+  });
+}

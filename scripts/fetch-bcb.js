@@ -11,10 +11,15 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const SERIES = [
   { code: '432', series_id: 'BCB_SELIC', name_pt: 'Meta Selic (Copom)', description_pt: 'Taxa básica de juros definida pelo Banco Central. Afeta diretamente o custo do dinheiro no Brasil e o DI futuro.', frequency: 'event' },
   { code: '433', series_id: 'BCB_IPCA', name_pt: 'IPCA - Inflação oficial (Brasil)', description_pt: 'Inflação oficial do Brasil. Acima do esperado pressiona o Banco Central a manter ou subir juros.', frequency: 'monthly' },
+  { code: '7478', series_id: 'BCB_IPCA15', name_pt: 'IPCA-15 - Prévia da inflação (Brasil)', description_pt: 'Prévia do IPCA, sai antes do dado oficial do mês. Serve de antecipação pro mercado.', frequency: 'monthly' },
+  { code: '189', series_id: 'BCB_IGPM', name_pt: 'IGP-M (Brasil)', description_pt: 'Índice de preços usado em aluguéis e contratos. Sensível ao câmbio e a preços no atacado.', frequency: 'monthly' },
+  { code: '22099', series_id: 'BCB_PIB', name_pt: 'PIB Trimestral (Brasil)', description_pt: 'Crescimento econômico trimestral do Brasil. Acima do esperado tende a fortalecer o real.', frequency: 'quarterly' },
+  { code: '24369', series_id: 'BCB_DESEMPREGO', name_pt: 'Taxa de Desemprego - PNAD Contínua (Brasil)', description_pt: 'Desemprego oficial do Brasil. Alta pode sinalizar economia fraca e pressionar o Banco Central a cortar juros.', frequency: 'monthly' },
+  { code: '22707', series_id: 'BCB_BALANCA', name_pt: 'Balança Comercial (Brasil)', description_pt: 'Diferença entre exportações e importações brasileiras. Superávit forte tende a ajudar o real.', frequency: 'monthly' },
   { code: '1', series_id: 'BCB_USDBRL', name_pt: 'Câmbio USD/BRL (PTAX)', description_pt: 'Cotação oficial do dólar frente ao real. Referência direta para o WDO — também usamos essa série para medir a reação do mercado a outros indicadores.', frequency: 'daily' },
 ];
 
-const START_YEAR = { '432': 2000, '433': 2000, '1': 1999 };
+const START_YEAR = { '432': 2000, '433': 2000, '7478': 2000, '189': 2000, '22099': 1996, '24369': 2012, '22707': 1995, '1': 1999 };
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
