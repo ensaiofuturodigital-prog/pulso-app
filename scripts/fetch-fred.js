@@ -18,6 +18,7 @@ const INDICATORS = [
   { code: 'DFF', name_pt: 'Taxa de Juros do Fed', description_pt: 'Juros básicos dos EUA. Afeta diretamente o fluxo de dólar pro mundo todo.', frequency: 'daily' },
   { code: 'DGS10', name_pt: 'Treasury 10 anos (EUA)', description_pt: 'Juro de longo prazo dos EUA. Sobe = geralmente dólar fortalece e bolsas caem.', frequency: 'daily' },
   { code: 'DTWEXBGS', name_pt: 'Índice do Dólar (DXY ampliado)', description_pt: 'Força do dólar frente a uma cesta de moedas. Correlação direta e forte com o WDO.', frequency: 'daily' },
+  { code: 'DCOILWTICO', name_pt: 'Petróleo WTI', description_pt: 'Preço do petróleo bruto americano. Pesa no Ibovespa via Petrobras e afeta o câmbio de países exportadores.', frequency: 'daily' },
   { code: 'RSAFS', name_pt: 'Vendas no Varejo (EUA)', description_pt: 'Termômetro do consumo americano. Forte = economia aquecida.', frequency: 'monthly' },
   { code: 'HOUST', name_pt: 'Início de Construções - Housing Starts (EUA)', description_pt: 'Novo canteiro de obras iniciado. Sensível a juros altos.', frequency: 'monthly' },
   { code: 'PERMIT', name_pt: 'Alvarás de Construção (EUA)', description_pt: 'Antecipa novas construções — indicador adiantado do setor imobiliário.', frequency: 'monthly' },

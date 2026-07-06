@@ -130,8 +130,12 @@ async function loadIndicators() {
       .select('*')
       .order('name_pt');
     if (indErr) throw indErr;
-    // BCB_USDBRL e IBOV são referências de mercado usadas nos cálculos, não indicadores em si
-    const indicators = (indicatorsRaw || []).filter(i => i.code !== 'BCB_USDBRL' && i.code !== 'IBOV');
+    // BCB_USDBRL e IBOV são referências de mercado usadas nos cálculos, não indicadores em si.
+    // DXY/T-Note/Petróleo viram o ticker de correlacionados no topo, em vez de card normal.
+    const TICKER_CODES = ['DTWEXBGS', 'DGS10', 'DCOILWTICO'];
+    const indicators = (indicatorsRaw || []).filter(i =>
+      i.code !== 'BCB_USDBRL' && i.code !== 'IBOV' && !TICKER_CODES.includes(i.code)
+    );
 
     if (!indicators || indicators.length === 0) {
       grid.innerHTML = '<p class="empty-note">Nenhum indicador ainda. O robô de coleta roda todo dia às 9h — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
@@ -315,6 +319,67 @@ async function loadOvernightNews() {
   }
 }
 
+/* ---------------- TICKER: ATIVOS CORRELACIONADOS ---------------- */
+async function loadTicker() {
+  const el = document.getElementById('correlatedTicker');
+  if (!el) return;
+  const CODES = ['DTWEXBGS', 'DGS10', 'DCOILWTICO'];
+  try {
+    const { data: indicators, error } = await supabase.from('indicators').select('*').in('code', CODES);
+    if (error) throw error;
+    if (!indicators || indicators.length === 0) { el.innerHTML = ''; return; }
+
+    const byCode = {};
+    indicators.forEach(i => byCode[i.code] = i);
+
+    const items = await Promise.all(CODES.map(async (code) => {
+      const ind = byCode[code];
+      if (!ind) return null;
+      const { data } = await supabase
+        .from('indicator_releases')
+        .select('*')
+        .eq('indicator_id', ind.id)
+        .order('release_date', { ascending: false })
+        .limit(1);
+      const rel = data && data[0];
+      if (!rel) return null;
+      const trend = trendClass(rel.actual_value, rel.previous_value);
+      return { name: ind.name_pt, value: rel.actual_value, trend };
+    }));
+
+    el.innerHTML = items.filter(Boolean).map(it => `
+      <div class="ticker-item">
+        <span class="ticker-name">${it.name}</span>
+        <span class="ticker-value ${it.trend}">${fmtNum(it.value)} ${it.trend === 'up' ? '▲' : it.trend === 'down' ? '▼' : '—'}</span>
+      </div>`).join('');
+  } catch (err) {
+    console.error(err);
+    el.innerHTML = '';
+  }
+}
+
+/* ---------------- SELO DE ÚLTIMA ATUALIZAÇÃO ---------------- */
+async function loadLastUpdate() {
+  const el = document.getElementById('lastUpdateBadge');
+  if (!el) return;
+  try {
+    const { data, error } = await supabase
+      .from('indicator_releases')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    if (!data || !data[0] || !data[0].created_at) { el.textContent = ''; return; }
+    const when = new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'
+    }).format(new Date(data[0].created_at));
+    el.textContent = `Dados atualizados em ${when}`;
+  } catch (err) {
+    console.error(err);
+    el.textContent = '';
+  }
+}
+
 /* ---------------- TRADE JOURNAL ---------------- */
 const form = document.getElementById('tradeForm');
 const statusEl = document.getElementById('formStatus');
@@ -397,6 +462,7 @@ async function loadJournal() {
     }).join('');
 
     renderWeeklySummary(data);
+    renderPatterns(data);
   } catch (err) {
     console.error(err);
     listEl.innerHTML = '<p class="empty-note">Não consegui carregar o diário agora.</p>';
@@ -443,7 +509,73 @@ function renderWeeklySummary(allTrades) {
   }).join('');
 }
 
-/* ---------------- RESUMO DO DIA (com navegação histórica) ---------------- */
+/* ---------------- PADRÕES: HORÁRIO E DIA DA SEMANA ---------------- */
+function renderPatterns(allTrades) {
+  const hourEl = document.getElementById('patternsByHour');
+  const wdEl = document.getElementById('patternsByWeekday');
+  if (!allTrades || allTrades.length < 5) {
+    const msg = '<p class="empty-note">Registre pelo menos 5 operações pra ver seus padrões por horário e dia da semana.</p>';
+    hourEl.innerHTML = msg;
+    wdEl.innerHTML = '';
+    return;
+  }
+
+  // Janelas de horário alinhadas com a sessão de operação (8h-19h)
+  const HOUR_BUCKETS = [
+    { label: '08h-10h', min: 8, max: 10 },
+    { label: '10h-12h', min: 10, max: 12 },
+    { label: '12h-14h', min: 12, max: 14 },
+    { label: '14h-16h', min: 14, max: 16 },
+    { label: '16h-19h', min: 16, max: 19 },
+  ];
+  const hourStats = HOUR_BUCKETS.map(b => ({ ...b, total: 0, count: 0, wins: 0 }));
+
+  const WEEKDAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const wdStats = WEEKDAY_NAMES.map(name => ({ name, total: 0, count: 0, wins: 0 }));
+
+  allTrades.forEach(t => {
+    const d = new Date(t.trade_time);
+    const hourFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false });
+    const hour = parseInt(hourFmt.format(d), 10);
+    const bucket = hourStats.find(b => hour >= b.min && hour < b.max);
+    if (bucket) {
+      bucket.total += (t.result || 0);
+      bucket.count += 1;
+      if ((t.result || 0) > 0) bucket.wins += 1;
+    }
+
+    const wdFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
+    const wdName = wdFmt.format(d);
+    const idxMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+    const wd = wdStats[idxMap[wdName]];
+    if (wd) {
+      wd.total += (t.result || 0);
+      wd.count += 1;
+      if ((t.result || 0) > 0) wd.wins += 1;
+    }
+  });
+
+  function renderRows(rows) {
+    const active = rows.filter(r => r.count > 0);
+    if (active.length === 0) return '<p class="empty-note">Sem dado suficiente ainda.</p>';
+    return active.map(r => {
+      const winRate = Math.round((r.wins / r.count) * 100);
+      const cls = r.total >= 0 ? 'pos' : 'neg';
+      return `
+        <div class="week-row">
+          <span class="week-label">${r.label || r.name}</span>
+          <span class="week-count">${r.count} op.</span>
+          <span class="week-winrate">${winRate}% acerto</span>
+          <span class="week-total ${cls}">${r.total >= 0 ? '+' : ''}${fmtNum(r.total)}</span>
+        </div>`;
+    }).join('');
+  }
+
+  hourEl.innerHTML = renderRows(hourStats);
+  wdEl.innerHTML = renderRows(wdStats.filter(w => w.name !== 'Domingo' && w.name !== 'Sábado'));
+}
+
+
 function scenarioLine(scenarioLabel, pctUsd, pctIbov) {
   function readoutInline(pctUp) {
     if (pctUp === null || pctUp === undefined) return '—';
@@ -754,6 +886,8 @@ document.querySelectorAll('#importanceFilter .filter-btn').forEach(btn => {
 
 /* ---------------- INIT ---------------- */
 loadIndicators();
+loadTicker();
+loadLastUpdate();
 loadTimeline();
 loadOvernightNews();
 loadJournal();

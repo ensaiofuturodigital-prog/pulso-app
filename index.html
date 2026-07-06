@@ -41,6 +41,7 @@
       <span class="dot" id="sessionDot"></span>
       <span id="clockText">--:--</span>
       <span class="clock-label" id="sessionLabel">carregando sessão…</span>
+      <span class="update-badge" id="lastUpdateBadge"></span>
     </div>
   </header>
 
@@ -75,6 +76,8 @@
           <h1>Painel de indicadores</h1>
           <p>Dados oficiais do FRED e do Banco Central, atualizados automaticamente todo dia às 8h (Brasília). Clique em "Ver probabilidade histórica" em qualquer cartão: se o dado vier acima ou abaixo do anterior, veja pra qual lado o WDO e o WIN tenderam historicamente. Isto é contexto para sua análise — não é recomendação de operação.</p>
         </div>
+
+        <div class="ticker-strip" id="correlatedTicker"></div>
 
         <details class="daily-summary" id="dailySummary" open>
           <summary id="dailySummaryHead">Carregando resumo do dia...</summary>
@@ -187,6 +190,18 @@
 
         <h2 class="section-subhead">Resultado da semana</h2>
         <div class="weekly-summary" id="weeklySummary"></div>
+
+        <h2 class="section-subhead">Seus padrões (horário e dia da semana)</h2>
+        <div class="patterns-grid">
+          <div class="pattern-col">
+            <h3 class="pattern-title">Por horário</h3>
+            <div id="patternsByHour"></div>
+          </div>
+          <div class="pattern-col">
+            <h3 class="pattern-title">Por dia da semana</h3>
+            <div id="patternsByWeekday"></div>
+          </div>
+        </div>
 
         <h2 class="section-subhead">Bloco de notas</h2>
         <div class="notepad-wrap">

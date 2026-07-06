@@ -503,6 +503,25 @@ button, input, select {
 
 /* ---------- WEEKLY SUMMARY ---------- */
 .weekly-summary { display: flex; flex-direction: column; gap: 6px; max-width: 640px; margin-bottom: 8px; }
+
+/* ---------- PADRÕES (horário / dia da semana) ---------- */
+.patterns-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 780px;
+  margin-bottom: 8px;
+}
+@media (max-width: 640px) { .patterns-grid { grid-template-columns: 1fr; } }
+.pattern-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+}
+.pattern-col .week-row { font-size: 13px; }
+.pattern-col .week-label { width: auto; flex: 1; }
 .week-row {
   display: flex;
   align-items: center;
@@ -780,6 +799,40 @@ button, input, select {
 .conf-badge.conf-high { color: var(--teal); background: var(--teal-dim); }
 .conf-badge.conf-mid { color: var(--amber); background: rgba(242,184,75,0.14); }
 .conf-badge.conf-low { color: var(--coral); background: var(--coral-dim); }
+
+/* ---------- TICKER DE CORRELACIONADOS ---------- */
+.ticker-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  padding-bottom: 2px;
+}
+.ticker-item {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  min-width: 150px;
+}
+.ticker-name { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); }
+.ticker-value { font-family: var(--font-mono); font-size: 15px; font-weight: 600; }
+.ticker-value.up { color: var(--teal); }
+.ticker-value.down { color: var(--coral); }
+.ticker-value.flat { color: var(--text-faint); }
+
+/* ---------- SELO DE ÚLTIMA ATUALIZAÇÃO ---------- */
+.update-badge {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-left: 10px;
+  white-space: nowrap;
+}
+@media (max-width: 719px) { .update-badge { display: none; } }
 
 /* ---------- DISCLAIMER FIXO ---------- */
 .panel-disclaimer {
