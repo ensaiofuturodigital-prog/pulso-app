@@ -30,6 +30,31 @@ function findIndexOnOrBefore(sortedDates, targetDate) {
   return ans;
 }
 
+// Olha as variações (diferença entre divulgações consecutivas) e verifica se as
+// últimas 3 fugiram muito do padrão histórico (z-score > 2 em cima da linha de base).
+function detectStructuralBreak(actualValues) {
+  const vals = actualValues.filter(v => v !== null && v !== undefined);
+  if (vals.length < 8) return null;
+
+  const diffs = [];
+  for (let i = 1; i < vals.length; i++) diffs.push(vals[i] - vals[i - 1]);
+
+  const RECENT = 3;
+  const baseline = diffs.slice(0, diffs.length - RECENT);
+  if (baseline.length < 5) return null;
+
+  const mean = baseline.reduce((a, b) => a + b, 0) / baseline.length;
+  const variance = baseline.reduce((a, b) => a + (b - mean) ** 2, 0) / (baseline.length - 1);
+  const std = Math.sqrt(variance);
+  if (!std) return null;
+
+  const recentDiffs = diffs.slice(diffs.length - RECENT);
+  const hasBreak = recentDiffs.some(d => Math.abs((d - mean) / std) > 2);
+  return hasBreak
+    ? 'Quebra estrutural detectada: a variação dos últimos registros fugiu bastante do padrão histórico. Use a probabilidade abaixo com mais cautela.'
+    : null;
+}
+
 function buildDirectionFn(series) {
   return function (targetDate) {
     const idx = findIndexOnOrBefore(series, targetDate);
@@ -101,6 +126,8 @@ async function run() {
       const sampleSize = up + down;
       if (sampleSize === 0) { console.log(`⏭️  ${ind.code}: sem amostra suficiente ainda`); continue; }
 
+      const alertText = detectStructuralBreak(releases.map(r => r.actual_value));
+
       const { error } = await supabase.from('indicator_stats').upsert({
         indicator_id: ind.id,
         sample_size: sampleSize,
@@ -112,6 +139,7 @@ async function run() {
         pct_ibov_up_after_indicator_down: ibovSampleDown > 0 ? Math.round((ibovUpAfterDown / ibovSampleDown) * 1000) / 10 : null,
         first_date: firstDate,
         last_date: lastDate,
+        alert_text: alertText,
         computed_at: new Date().toISOString(),
       }, { onConflict: 'indicator_id' });
 

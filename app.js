@@ -181,8 +181,10 @@ async function loadIndicators() {
           <p class="stats-empty">Ainda sem amostra suficiente pra esse indicador.</p></details>`;
       }
       const conf = confidenceLabel(s.sample_size);
+      const alertHtml = s.alert_text ? `<p class="alert-banner">⚠️ ${s.alert_text}</p>` : '';
       return `<details class="ind-stats"><summary>Ver probabilidade histórica (${s.sample_size} divulgações)</summary>
         <span class="conf-badge ${conf.cls}">${conf.text}</span>
+        ${alertHtml}
         ${scenarioRow('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up)}
         ${scenarioRow('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down)}
         <p class="stats-period">Baseado no histórico de ${fmtDate(s.first_date)} até ${fmtDate(s.last_date)}. WIN estimado via Ibovespa (proxy gratuito). Não é garantia de repetição — é o que aconteceu no passado.</p>
@@ -418,6 +420,8 @@ form.addEventListener('submit', async (e) => {
   el.value = now.toISOString().slice(0, 16);
 })();
 
+let lastJournalData = [];
+
 async function loadJournal() {
   const listEl = document.getElementById('journalList');
   const summaryEl = document.getElementById('journalSummary');
@@ -428,6 +432,7 @@ async function loadJournal() {
       .order('trade_time', { ascending: false })
       .limit(50);
     if (error) throw error;
+    lastJournalData = data || [];
 
     if (!data || data.length === 0) {
       summaryEl.innerHTML = '';
@@ -468,6 +473,33 @@ async function loadJournal() {
     listEl.innerHTML = '<p class="empty-note">Não consegui carregar o diário agora.</p>';
   }
 }
+
+/* ---------------- EXPORTAR CSV ---------------- */
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  if (!lastJournalData || lastJournalData.length === 0) {
+    alert('Nenhuma operação registrada ainda pra exportar.');
+    return;
+  }
+  const headers = ['ativo', 'data_hora_entrada', 'preco_entrada', 'data_hora_saida', 'preco_saida', 'resultado'];
+  const rows = lastJournalData.map(t => [
+    t.asset,
+    t.trade_time ? new Date(t.trade_time).toISOString() : '',
+    t.price ?? '',
+    t.exit_time ? new Date(t.exit_time).toISOString() : '',
+    t.exit_price ?? '',
+    t.result ?? '',
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pulso-diario-${todayStrBR()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
 
 /* ---------------- RESUMO SEMANAL ---------------- */
 function isoWeekKey(date) {
