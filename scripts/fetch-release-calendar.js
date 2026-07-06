@@ -34,7 +34,7 @@ async function run() {
 
   // DFF, DGS10 e DTWEXBGS são séries de mercado contínuas (têm valor todo dia útil),
   // não divulgações pontuais — não fazem sentido no calendário de "eventos do dia".
-  const CONTINUOUS_SERIES = ['DFF', 'DGS10', 'DTWEXBGS'];
+  const CONTINUOUS_SERIES = ['DFF', 'DGS10', 'DTWEXBGS', 'ECBMRRFR', 'ECBDFR'];
 
   const { data: indicators } = await supabase
     .from('indicators')
