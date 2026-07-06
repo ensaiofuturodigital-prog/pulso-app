@@ -8,6 +8,58 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/* ---------------- PUSH: notificações de eventos de alto impacto ---------------- */
+const VAPID_PUBLIC_KEY = 'BP7ICcRQYrLVOKg0sh5bCAzG88J7ww7izEie7WT1KN2l9ycjEvoQ0N4wuX8hLHHjJ8uT7C3A736J3ms2_6maG7M';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function enablePush() {
+  const btn = document.getElementById('enablePushBtn');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Seu navegador não suporta notificações push.');
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      alert('Permissão de notificação negada. Pra ativar depois, mude isso nas configurações do navegador/celular.');
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    const subJson = sub.toJSON();
+    const { error } = await supabase.from('push_subscriptions').upsert({
+      endpoint: subJson.endpoint,
+      p256dh: subJson.keys.p256dh,
+      auth: subJson.keys.auth,
+    }, { onConflict: 'endpoint' });
+    if (error) throw error;
+    btn.textContent = '🔔 Avisos ativados';
+    btn.disabled = true;
+  } catch (err) {
+    console.error(err);
+    alert('Não consegui ativar as notificações agora. Tenta de novo em instantes.');
+  }
+}
+
+async function checkPushStatus() {
+  const btn = document.getElementById('enablePushBtn');
+  if (!btn || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) { btn.textContent = '🔔 Avisos ativados'; btn.disabled = true; }
+  } catch { /* segue com o botão padrão */ }
+}
+
 /* ---------------- TABS ---------------- */
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -927,6 +979,8 @@ wireDailyDateNav();
 loadDailySummary(todayStrBR());
 loadNotepad();
 renderHolidayCalendar();
+document.getElementById('enablePushBtn').addEventListener('click', enablePush);
+checkPushStatus();
 
 /* ---------------- PWA: registra o service worker ---------------- */
 if ('serviceWorker' in navigator) {
