@@ -187,8 +187,10 @@ async function loadIndicators() {
     // BCB_USDBRL e IBOV são referências de mercado usadas nos cálculos, não indicadores em si.
     // DXY/T-Note/Petróleo viram o ticker de correlacionados no topo, em vez de card normal.
     const TICKER_CODES = ['DTWEXBGS', 'DGS10', 'DCOILWTICO'];
+    // Removidos a pedido: CPI (já coberto pelo Núcleo do CPI) e HSP - Housing Starts/Permits (HOUST, PERMIT)
+    const HIDDEN_CODES = ['CPIAUCSL', 'HOUST', 'PERMIT'];
     const indicators = (indicatorsRaw || []).filter(i =>
-      i.code !== 'BCB_USDBRL' && i.code !== 'IBOV' && !TICKER_CODES.includes(i.code)
+      i.code !== 'BCB_USDBRL' && i.code !== 'IBOV' && !TICKER_CODES.includes(i.code) && !HIDDEN_CODES.includes(i.code)
     );
 
     if (!indicators || indicators.length === 0) {
@@ -781,12 +783,13 @@ async function loadDailySummary(dateStr) {
         const actualUp = actualTrend === 'up';
         const hit = predictedUp === actualUp;
         retroHtml += `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">
-          ${hit ? '✅' : '❌'} Nesse dia, o dólar de fato <b>${actualUp ? 'subiu' : 'caiu'}</b>
+          ${hit ? '✅' : '❌'} Nesse dia, a cotação PTAX (Banco Central) de fato <b>${actualUp ? 'subiu' : 'caiu'}</b>
           (${fmtNum(usdRelease.actual_value)} vs. ${fmtNum(usdRelease.previous_value)}) —
           ${hit ? 'bateu' : 'não bateu'} com a probabilidade histórica agregada.
+          <span class="retro-note">A PTAX é a taxa oficial de câmbio, apurada por volta do meio-dia — pode divergir do fechamento do WDO no mesmo dia.</span>
         </div>`;
       } else if (actualTrend === 'flat') {
-        retroHtml += `<div class="retro-banner retro-pending">O dólar fechou estável nesse dia.</div>`;
+        retroHtml += `<div class="retro-banner retro-pending">A PTAX (Banco Central) fechou estável nesse dia.</div>`;
       }
     } else {
       const isFuture = dateStr > todayStrBR();
@@ -972,7 +975,7 @@ document.querySelectorAll('#importanceFilter .filter-btn').forEach(btn => {
 
 /* ---------------- INIT ---------------- */
 loadIndicators();
-loadTicker();
+// loadTicker(); // removido a pedido: DXY/Treasury/Petróleo não aparecem mais no topo
 loadLastUpdate();
 loadTimeline();
 loadOvernightNews();
