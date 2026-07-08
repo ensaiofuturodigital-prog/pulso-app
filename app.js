@@ -149,9 +149,11 @@ function todayStrBR() {
 function countryFlag(c) {
   return c === 'BR' ? '🇧🇷' : c === 'US' ? '🇺🇸' : '';
 }
-function starRating(n) {
-  const stars = n || 1;
-  return '★'.repeat(stars) + '☆'.repeat(3 - stars);
+function importanceBadge(n) {
+  const lvl = n || 1;
+  if (lvl >= 3) return `<span class="impact-badge imp-3">Alto impacto</span>`;
+  if (lvl === 2) return `<span class="impact-badge imp-2">Impacto moderado</span>`;
+  return `<span class="impact-badge imp-1">Baixo impacto</span>`;
 }
 function confidenceLabel(sampleSize) {
   if (sampleSize >= 30) return { text: 'Confiança alta', cls: 'conf-high' };
@@ -271,8 +273,8 @@ async function loadIndicators() {
 
       card.innerHTML = `
         <div class="ind-card-top">
-          <div><div class="ind-name">${flag} ${ind.name_pt}</div><div class="ind-code">${ind.code} · ${ind.frequency || ''} <span class="star-badge">${starRating(ind.importance)}</span></div></div>
-          <span class="ind-badge ${trend}">${badgeText}</span>
+          <div><div class="ind-name">${flag} ${ind.name_pt}</div><div class="ind-code">${ind.code} · ${ind.frequency || ''}</div></div>
+          <div class="ind-badges"><span class="ind-badge ${trend}">${badgeText}</span>${importanceBadge(ind.importance)}</div>
         </div>
         <div class="ind-values">
           <span class="ind-value">${fmtNum(rel.actual_value)}</span>
@@ -740,7 +742,7 @@ async function loadDailySummary(dateStr) {
         : '<p class="stats-empty">Sem amostra histórica suficiente ainda.</p>';
       return `
         <div class="summary-item">
-          <div class="summary-item-head">${flag} <b>${ind.name_pt}</b> <span class="star-badge">${starRating(ind.importance)}</span>${time}</div>
+          <div class="summary-item-head">${flag} <b>${ind.name_pt}</b> ${importanceBadge(ind.importance)}${time}</div>
           ${scenarios}
         </div>`;
     }).join('');
