@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-
+ 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
+ 
 async function fetchAllRows(table, select, filters = (q) => q, orderCol = 'release_date') {
   let all = [];
   let from = 0;
@@ -19,7 +19,7 @@ async function fetchAllRows(table, select, filters = (q) => q, orderCol = 'relea
   }
   return all;
 }
-
+ 
 function findIndexOnOrBefore(sortedDates, targetDate) {
   let lo = 0, hi = sortedDates.length - 1, ans = -1;
   while (lo <= hi) {
@@ -29,32 +29,32 @@ function findIndexOnOrBefore(sortedDates, targetDate) {
   }
   return ans;
 }
-
+ 
 // Olha as variações (diferença entre divulgações consecutivas) e verifica se as
 // últimas 3 fugiram muito do padrão histórico (z-score > 2 em cima da linha de base).
 function detectStructuralBreak(actualValues) {
   const vals = actualValues.filter(v => v !== null && v !== undefined);
   if (vals.length < 8) return null;
-
+ 
   const diffs = [];
   for (let i = 1; i < vals.length; i++) diffs.push(vals[i] - vals[i - 1]);
-
+ 
   const RECENT = 3;
   const baseline = diffs.slice(0, diffs.length - RECENT);
   if (baseline.length < 5) return null;
-
+ 
   const mean = baseline.reduce((a, b) => a + b, 0) / baseline.length;
   const variance = baseline.reduce((a, b) => a + (b - mean) ** 2, 0) / (baseline.length - 1);
   const std = Math.sqrt(variance);
   if (!std) return null;
-
+ 
   const recentDiffs = diffs.slice(diffs.length - RECENT);
   const hasBreak = recentDiffs.some(d => Math.abs((d - mean) / std) > 2);
   return hasBreak
     ? 'Quebra estrutural detectada: a variação dos últimos registros fugiu bastante do padrão histórico. Use a probabilidade abaixo com mais cautela.'
     : null;
 }
-
+ 
 function buildDirectionFn(series) {
   return function (targetDate) {
     const idx = findIndexOnOrBefore(series, targetDate);
@@ -66,7 +66,52 @@ function buildDirectionFn(series) {
     return 'flat';
   };
 }
-
+ 
+// ---------------------------------------------------------------------------
+// INTERVALO DE CONFIANÇA DE WILSON
+// Cada indicador funciona como uma "moeda" (o mercado sobe ou não, dado o
+// indicador). A % que já calculamos é a frequência observada (estimativa
+// binomial). O que faltava era medir o quão confiável é essa frequência,
+// já que amostras pequenas (ex: PIB trimestral, só ~30 casos) podem gerar
+// uma % que parece um padrão forte mas é, na prática, ruído estatístico.
+// O intervalo de Wilson responde: "com 95% de confiança, a probabilidade
+// real está entre X% e Y%". Quanto mais estreito o intervalo, mais confiável.
+// ---------------------------------------------------------------------------
+function wilsonInterval(successes, n, z = 1.96) {
+  if (!n) return null;
+  const phat = successes / n;
+  const denom = 1 + (z * z) / n;
+  const center = phat + (z * z) / (2 * n);
+  const margin = z * Math.sqrt((phat * (1 - phat)) / n + (z * z) / (4 * n * n));
+  return {
+    low: Math.round(Math.max(0, (center - margin) / denom) * 1000) / 10,
+    high: Math.round(Math.min(1, (center + margin) / denom) * 1000) / 10,
+  };
+}
+ 
+// Selo de confiança: leva em conta tanto o tamanho da amostra quanto a
+// largura do intervalo (uma amostra grande ainda pode gerar intervalo largo
+// se a % estiver perto de 50%, e vice-versa).
+function confidenceLabel(n, interval) {
+  if (!n || !interval) return 'baixa';
+  const width = interval.high - interval.low;
+  if (n >= 100 && width <= 15) return 'alta';
+  if (n >= 30 && width <= 30) return 'media';
+  return 'baixa';
+}
+ 
+function buildConfidenceEntry(successes, n) {
+  if (!n) return null;
+  const interval = wilsonInterval(successes, n);
+  return {
+    n,
+    pct: Math.round((successes / n) * 1000) / 10,
+    ci_low: interval.low,
+    ci_high: interval.high,
+    level: confidenceLabel(n, interval),
+  };
+}
+ 
 async function loadMarketSeries(code) {
   const { data: ind, error } = await supabase.from('indicators').select('id').eq('code', code).single();
   if (error || !ind) { console.log(`⚠️  Série de mercado ${code} não encontrada — rode o fetch correspondente primeiro.`); return null; }
@@ -75,20 +120,20 @@ async function loadMarketSeries(code) {
   console.log(`Série ${code} carregada: ${series.length} pontos (${series[0]?.date} a ${series[series.length - 1]?.date}).`);
   return { id: ind.id, series };
 }
-
+ 
 async function run() {
   console.log('Calculando estatísticas de correlação com USD/BRL (WDO) e Ibovespa (WIN)...');
-
+ 
   const usd = await loadMarketSeries('BCB_USDBRL');
   const ibov = await loadMarketSeries('IBOV');
   if (!usd) throw new Error('Sem série do dólar — impossível continuar.');
-
+ 
   const usdDirectionOn = buildDirectionFn(usd.series);
   const ibovDirectionOn = ibov ? buildDirectionFn(ibov.series) : () => null;
-
+ 
   const excludeCodes = ['BCB_USDBRL', 'IBOV'];
   const { data: indicators } = await supabase.from('indicators').select('id, code').not('code', 'in', `(${excludeCodes.join(',')})`);
-
+ 
   for (const ind of indicators) {
     try {
       const releases = await fetchAllRows(
@@ -96,38 +141,45 @@ async function run() {
         'release_date, actual_value, previous_value',
         (q) => q.eq('indicator_id', ind.id)
       );
-
+ 
       let up = 0, down = 0;
       let usdUpAfterUp = 0, usdUpAfterDown = 0;
       let ibovUpAfterUp = 0, ibovUpAfterDown = 0, ibovSampleUp = 0, ibovSampleDown = 0;
       let firstDate = null, lastDate = null;
-
+ 
       for (const r of releases) {
         if (r.previous_value === null || r.previous_value === undefined) continue;
         const trend = r.actual_value > r.previous_value ? 'up' : r.actual_value < r.previous_value ? 'down' : null;
         if (!trend) continue;
-
+ 
         const usdDir = usdDirectionOn(r.release_date);
         if (!usdDir || usdDir === 'flat') continue;
-
+ 
         if (!firstDate) firstDate = r.release_date;
         lastDate = r.release_date;
-
+ 
         if (trend === 'up') { up++; if (usdDir === 'up') usdUpAfterUp++; }
         else { down++; if (usdDir === 'up') usdUpAfterDown++; }
-
+ 
         const ibovDir = ibovDirectionOn(r.release_date);
         if (ibovDir && ibovDir !== 'flat') {
           if (trend === 'up') { ibovSampleUp++; if (ibovDir === 'up') ibovUpAfterUp++; }
           else { ibovSampleDown++; if (ibovDir === 'up') ibovUpAfterDown++; }
         }
       }
-
+ 
       const sampleSize = up + down;
       if (sampleSize === 0) { console.log(`⏭️  ${ind.code}: sem amostra suficiente ainda`); continue; }
-
+ 
       const alertText = detectStructuralBreak(releases.map(r => r.actual_value));
-
+ 
+      const confidence = {
+        usd_up: buildConfidenceEntry(usdUpAfterUp, up),
+        usd_down: buildConfidenceEntry(usdUpAfterDown, down),
+        ibov_up: buildConfidenceEntry(ibovUpAfterUp, ibovSampleUp),
+        ibov_down: buildConfidenceEntry(ibovUpAfterDown, ibovSampleDown),
+      };
+ 
       const { error } = await supabase.from('indicator_stats').upsert({
         indicator_id: ind.id,
         sample_size: sampleSize,
@@ -137,20 +189,21 @@ async function run() {
         pct_usd_up_after_indicator_down: down > 0 ? Math.round((usdUpAfterDown / down) * 1000) / 10 : null,
         pct_ibov_up_after_indicator_up: ibovSampleUp > 0 ? Math.round((ibovUpAfterUp / ibovSampleUp) * 1000) / 10 : null,
         pct_ibov_up_after_indicator_down: ibovSampleDown > 0 ? Math.round((ibovUpAfterDown / ibovSampleDown) * 1000) / 10 : null,
+        confidence,
         first_date: firstDate,
         last_date: lastDate,
         alert_text: alertText,
         computed_at: new Date().toISOString(),
       }, { onConflict: 'indicator_id' });
-
+ 
       if (error) throw error;
-      console.log(`✅ ${ind.code}: amostra de ${sampleSize} divulgações (${firstDate} a ${lastDate})`);
+      console.log(`✅ ${ind.code}: amostra de ${sampleSize} divulgações (${firstDate} a ${lastDate}) — confiança: ${confidence.usd_up?.level ?? 'n/a'}`);
     } catch (err) {
       console.error(`❌ Falha em ${ind.code}:`, err.message);
     }
   }
-
+ 
   console.log('Finalizado.');
 }
-
+ 
 run();
