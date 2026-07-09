@@ -2,7 +2,7 @@ name: Fetch USD/BRL Data (Yahoo)
 
 on:
   schedule:
-    - cron: '15 10 * * *'  # todo dia às 10h15 UTC (7h15 Brasília), entre o BCB e o Ibovespa
+    - cron: '0,30 12-21 * * 1-5'  # de 30 em 30 min, 9h00-18h30 Brasília (12h-21h30 UTC), seg-sex
   workflow_dispatch:
 
 jobs:
