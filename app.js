@@ -213,20 +213,25 @@ async function loadIndicators() {
     const statsMap = {};
     (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
 
-    function readout(pctUp) {
-      if (pctUp === null || pctUp === undefined) return { arrow: '—', label: 'sem dado', cls: 'flat', pct: '—' };
-      if (pctUp >= 50) return { arrow: '▲', label: 'tende a SUBIR', cls: 'up', pct: pctUp };
-      return { arrow: '▼', label: 'tende a CAIR', cls: 'down', pct: Math.round((100 - pctUp) * 10) / 10 };
+    function readout(pctUp, ci) {
+      if (pctUp === null || pctUp === undefined) return { arrow: '—', label: 'sem dado', cls: 'flat', pct: '—', range: '' };
+      const hasCi = ci && ci.ci_low !== null && ci.ci_low !== undefined && ci.ci_high !== null && ci.ci_high !== undefined;
+      if (pctUp >= 50) {
+        const range = hasCi ? ` (${fmtNum(ci.ci_low)}–${fmtNum(ci.ci_high)}%)` : '';
+        return { arrow: '▲', label: 'tende a SUBIR', cls: 'up', pct: pctUp, range };
+      }
+      const range = hasCi ? ` (${fmtNum(Math.round((100 - ci.ci_high) * 10) / 10)}–${fmtNum(Math.round((100 - ci.ci_low) * 10) / 10)}%)` : '';
+      return { arrow: '▼', label: 'tende a CAIR', cls: 'down', pct: Math.round((100 - pctUp) * 10) / 10, range };
     }
 
-    function scenarioRow(scenarioLabel, pctUsd, pctIbov) {
-      const wdo = readout(pctUsd);
-      const win = readout(pctIbov);
+    function scenarioRow(scenarioLabel, pctUsd, pctIbov, ciUsd, ciIbov) {
+      const wdo = readout(pctUsd, ciUsd);
+      const win = readout(pctIbov, ciIbov);
       return `
         <div class="scenario-row">
           <span class="scenario-label">${scenarioLabel}</span>
-          <span class="scenario-asset"><b>WDO</b> <span class="arrow ${wdo.cls}">${wdo.arrow}</span> ${wdo.label} <b>${wdo.pct}%</b></span>
-          <span class="scenario-asset"><b>WIN</b> <span class="arrow ${win.cls}">${win.arrow}</span> ${win.label} <b>${win.pct}%</b></span>
+          <span class="scenario-asset"><b>WDO</b> <span class="arrow ${wdo.cls}">${wdo.arrow}</span> ${wdo.label} <b>${wdo.pct}%</b><span class="ci-range">${wdo.range}</span></span>
+          <span class="scenario-asset"><b>WIN</b> <span class="arrow ${win.cls}">${win.arrow}</span> ${win.label} <b>${win.pct}%</b><span class="ci-range">${win.range}</span></span>
         </div>`;
     }
 
@@ -241,9 +246,9 @@ async function loadIndicators() {
       return `<details class="ind-stats"><summary>Ver probabilidade histórica (${s.sample_size} divulgações)</summary>
         <span class="conf-badge ${conf.cls}">${conf.text}</span>
         ${alertHtml}
-        ${scenarioRow('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up)}
-        ${scenarioRow('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down)}
-        <p class="stats-period">Baseado no histórico de ${fmtDate(s.first_date)} até ${fmtDate(s.last_date)}. WIN estimado via Ibovespa (proxy gratuito). Não é garantia de repetição — é o que aconteceu no passado.</p>
+        ${scenarioRow('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up)}
+        ${scenarioRow('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)}
+        <p class="stats-period">Baseado no histórico de ${fmtDate(s.first_date)} até ${fmtDate(s.last_date)}. O número entre parênteses é a faixa provável real (intervalo de confiança de 95%) — quanto menor a amostra, mais larga a faixa. WIN estimado via Ibovespa (proxy gratuito). Não é garantia de repetição — é o que aconteceu no passado.</p>
       </details>`;
     }
 
@@ -664,13 +669,19 @@ function renderPatterns(allTrades) {
 }
 
 
-function scenarioLine(scenarioLabel, pctUsd, pctIbov) {
-  function readoutInline(pctUp) {
+function scenarioLine(scenarioLabel, pctUsd, pctIbov, ciUsd, ciIbov) {
+  function readoutInline(pctUp, ci) {
     if (pctUp === null || pctUp === undefined) return '—';
-    if (pctUp >= 50) return `<span class="arrow up">▲</span> SOBE ${pctUp}%`;
-    return `<span class="arrow down">▼</span> CAI ${Math.round((100 - pctUp) * 10) / 10}%`;
+    const hasCi = ci && ci.ci_low !== null && ci.ci_low !== undefined && ci.ci_high !== null && ci.ci_high !== undefined;
+    if (pctUp >= 50) {
+      const range = hasCi ? ` (${fmtNum(ci.ci_low)}–${fmtNum(ci.ci_high)}%)` : '';
+      return `<span class="arrow up">▲</span> SOBE ${pctUp}%<span class="ci-range">${range}</span>`;
+    }
+    const pctDown = Math.round((100 - pctUp) * 10) / 10;
+    const range = hasCi ? ` (${fmtNum(Math.round((100 - ci.ci_high) * 10) / 10)}–${fmtNum(Math.round((100 - ci.ci_low) * 10) / 10)}%)` : '';
+    return `<span class="arrow down">▼</span> CAI ${pctDown}%<span class="ci-range">${range}</span>`;
   }
-  return `<div class="summary-scenario"><b>${scenarioLabel}</b>: WDO ${readoutInline(pctUsd)} · WIN ${readoutInline(pctIbov)}</div>`;
+  return `<div class="summary-scenario"><b>${scenarioLabel}</b>: WDO ${readoutInline(pctUsd, ciUsd)} · WIN ${readoutInline(pctIbov, ciIbov)}</div>`;
 }
 
 async function loadDailySummary(dateStr) {
@@ -739,8 +750,8 @@ async function loadDailySummary(dateStr) {
 
       const scenarios = s
         ? `<span class="conf-badge ${confidenceLabel(s.sample_size).cls}">${confidenceLabel(s.sample_size).text} · ${s.sample_size} divulgações</span>` +
-          scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up) +
-          scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down)
+          scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up) +
+          scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)
         : '<p class="stats-empty">Sem amostra histórica suficiente ainda.</p>';
       return `
         <div class="summary-item">
