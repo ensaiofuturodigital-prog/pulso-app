@@ -770,6 +770,7 @@ async function loadDailySummary(dateStr) {
     } catch { /* segue sem conferência retroativa se não achar */ }
 
     let usdRelease = null;
+    let usdPrice = null;
     if (usdIndId) {
       const { data: usdRows } = await supabase
         .from('indicator_releases')
@@ -778,6 +779,14 @@ async function loadDailySummary(dateStr) {
         .eq('release_date', dateStr)
         .limit(1);
       usdRelease = usdRows && usdRows[0] ? usdRows[0] : null;
+
+      const { data: priceRows } = await supabase
+        .from('price_daily')
+        .select('open,high,low,close')
+        .eq('asset', 'USDBRL')
+        .eq('price_date', dateStr)
+        .limit(1);
+      usdPrice = priceRows && priceRows[0] ? priceRows[0] : null;
     }
 
     let retroHtml = '';
@@ -793,14 +802,17 @@ async function loadDailySummary(dateStr) {
         const predictedUp = aggProb >= 50;
         const actualUp = actualTrend === 'up';
         const hit = predictedUp === actualUp;
+        const openCloseHtml = usdPrice && usdPrice.open != null
+          ? `<span class="retro-note">Abertura R$ ${fmtNum(usdPrice.open)} · Fechamento R$ ${fmtNum(usdPrice.close)}${usdPrice.high != null ? ` · Máx R$ ${fmtNum(usdPrice.high)} · Mín R$ ${fmtNum(usdPrice.low)}` : ''}</span>`
+          : '';
         retroHtml += `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">
-          ${hit ? '✅' : '❌'} Nesse dia, a cotação PTAX (Banco Central) de fato <b>${actualUp ? 'subiu' : 'caiu'}</b>
-          (${fmtNum(usdRelease.actual_value)} vs. ${fmtNum(usdRelease.previous_value)}) —
+          ${hit ? '✅' : '❌'} Nesse dia, o dólar à vista de fato <b>${actualUp ? 'subiu' : 'caiu'}</b>
+          (fechamento R$ ${fmtNum(usdRelease.actual_value)} vs. R$ ${fmtNum(usdRelease.previous_value)} do dia anterior) —
           ${hit ? 'bateu' : 'não bateu'} com a probabilidade histórica agregada.
-          <span class="retro-note">A PTAX é a taxa oficial de câmbio, apurada por volta do meio-dia — pode divergir do fechamento do WDO no mesmo dia.</span>
+          ${openCloseHtml}
         </div>`;
       } else if (actualTrend === 'flat') {
-        retroHtml += `<div class="retro-banner retro-pending">A PTAX (Banco Central) fechou estável nesse dia.</div>`;
+        retroHtml += `<div class="retro-banner retro-pending">O dólar à vista fechou estável nesse dia.</div>`;
       }
     } else {
       const isFuture = dateStr > todayStrBR();

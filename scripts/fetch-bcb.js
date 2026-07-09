@@ -6,8 +6,9 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Séries do Banco Central (API pública SGS, sem necessidade de chave).
-// BCB_USDBRL também funciona como nosso "termômetro de mercado" pra
-// cruzar com os outros indicadores (câmbio reage rápido a tudo).
+// O câmbio USD/BRL saiu daqui e passou a vir do fetch-usdbrl.js (Yahoo
+// Finance, dólar à vista com OHLC) — mais parecido com o candlestick do WDO
+// do que a PTAX, que era só uma foto do meio-dia.
 const SERIES = [
   { code: '432', series_id: 'BCB_SELIC', name_pt: 'Meta Selic (Copom)', description_pt: 'Taxa básica de juros definida pelo Banco Central. Afeta diretamente o custo do dinheiro no Brasil e o DI futuro.', frequency: 'event' },
   { code: '433', series_id: 'BCB_IPCA', name_pt: 'IPCA - Inflação oficial (Brasil)', description_pt: 'Inflação oficial do Brasil. Acima do esperado pressiona o Banco Central a manter ou subir juros.', frequency: 'monthly' },
@@ -16,10 +17,9 @@ const SERIES = [
   { code: '22099', series_id: 'BCB_PIB', name_pt: 'PIB Trimestral (Brasil)', description_pt: 'Crescimento econômico trimestral do Brasil. Acima do esperado tende a fortalecer o real.', frequency: 'quarterly' },
   { code: '24369', series_id: 'BCB_DESEMPREGO', name_pt: 'Taxa de Desemprego - PNAD Contínua (Brasil)', description_pt: 'Desemprego oficial do Brasil. Alta pode sinalizar economia fraca e pressionar o Banco Central a cortar juros.', frequency: 'monthly' },
   { code: '22707', series_id: 'BCB_BALANCA', name_pt: 'Balança Comercial (Brasil)', description_pt: 'Diferença entre exportações e importações brasileiras. Superávit forte tende a ajudar o real.', frequency: 'monthly' },
-  { code: '1', series_id: 'BCB_USDBRL', name_pt: 'Câmbio USD/BRL (PTAX)', description_pt: 'Cotação oficial do dólar frente ao real. Referência direta para o WDO — também usamos essa série para medir a reação do mercado a outros indicadores.', frequency: 'daily' },
 ];
 
-const START_YEAR = { '432': 2000, '433': 2000, '7478': 2000, '189': 2000, '22099': 1996, '24369': 2012, '22707': 1995, '1': 1999 };
+const START_YEAR = { '432': 2000, '433': 2000, '7478': 2000, '189': 2000, '22099': 1996, '24369': 2012, '22707': 1995 };
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
