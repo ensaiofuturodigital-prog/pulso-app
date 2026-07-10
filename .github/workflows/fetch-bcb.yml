@@ -2,8 +2,8 @@ name: Fetch BCB Data
 
 on:
   schedule:
-    - cron: '10 10 * * *'         # rodada principal: 10h10 UTC (7h10 Brasília)
-    - cron: '5,35 11-16 * * 1-5'  # pós-divulgação: de 30 em 30 min, 8h-13h Brasília, dias úteis
+    - cron: '10 10 * * *'       # rodada principal: 10h10 UTC (7h10 Brasília)
+    - cron: '2-59/5 11-21 * * 1-5'  # pós-divulgação: de 5 em 5 min, ~8h-18h55 Brasília, dias úteis
   workflow_dispatch:
 
 jobs:

@@ -601,6 +601,33 @@ button, input, select {
 .notepad-status { display: inline-block; font-size: 13px; color: var(--text-faint); margin-top: 6px; height: 14px; }
 .notepad-counter { display: inline-block; float: right; font-size: 13px; color: var(--text-faint); margin-top: 6px; font-family: var(--font-mono); }
 
+/* ---------- CARD COMPACTO: PROBABILIDADES DO DIA ---------- */
+.prob-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 16px 0;
+}
+.prob-card-head { font-family: var(--font-display); font-weight: 700; font-size: 17px; margin-bottom: 12px; }
+.prob-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.prob-row:first-of-type { border-top: none; }
+.prob-asset { font-weight: 600; font-size: 15px; min-width: 160px; }
+.prob-side { display: flex; align-items: center; gap: 6px; font-size: 17px; font-family: var(--font-mono); font-weight: 600; }
+.prob-side b { font-size: 20px; }
+.prob-side.prob-up { color: var(--teal); }
+.prob-side.prob-down { color: var(--coral); }
+.prob-arrow { font-size: 20px; line-height: 1; }
+.prob-empty { color: var(--text-faint); font-size: 13.5px; }
+.prob-warning { font-size: 12.5px; color: var(--text-faint); margin-top: 10px; }
+
 /* ---------- HOLIDAY CALENDAR ---------- */
 .calendar-legend-intro { font-size: 14px; color: var(--text-dim); margin: 0 0 12px; }
 .holiday-calendar {

@@ -193,13 +193,19 @@ async function loadIndicators() {
       i.code !== 'BCB_USDBRL' && i.code !== 'IBOV' && !TICKER_CODES.includes(i.code) && !HIDDEN_CODES.includes(i.code)
     );
 
-    if (!indicators || indicators.length === 0) {
-      grid.innerHTML = '<p class="empty-note">Nenhum indicador ainda. O robô de coleta roda todo dia às 9h — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
+    // Só mostra quem está agendado pra hoje (qualquer relevância: baixa, média ou alta).
+    const todayStr = todayStrBR();
+    const { data: todaySchedule } = await supabase.from('release_schedule').select('indicator_id').eq('release_date', todayStr);
+    const todayIds = new Set((todaySchedule || []).map(s => s.indicator_id));
+    const indicatorsToday = indicators.filter(i => todayIds.has(i.id));
+
+    if (indicatorsToday.length === 0) {
+      grid.innerHTML = '<p class="empty-note">Nenhum indicador programado pra hoje, pelo calendário do FRED. Veja outros dias na aba Calendário.</p>';
       return;
     }
 
     const releasesByIndicator = {};
-    await Promise.all(indicators.map(async (ind) => {
+    await Promise.all(indicatorsToday.map(async (ind) => {
       const { data } = await supabase
         .from('indicator_releases')
         .select('*')
@@ -253,7 +259,7 @@ async function loadIndicators() {
     }
 
     grid.innerHTML = '';
-    indicators.forEach(ind => {
+    indicatorsToday.forEach(ind => {
       const indReleases = releasesByIndicator[ind.id] || [];
       const rel = indReleases[indReleases.length - 1];
       const flag = countryFlag(ind.country);
@@ -675,6 +681,30 @@ function renderPatterns(allTrades) {
 }
 
 
+function renderTodayProbCard(aggProbUsd, aggProbIbov) {
+  const el = document.getElementById('todayProbCard');
+  if (!el) return;
+
+  function row(assetLabel, pctUp) {
+    if (pctUp === null || pctUp === undefined) {
+      return `<div class="prob-row"><span class="prob-asset">${assetLabel}</span><span class="prob-empty">sem dado suficiente pra hoje</span></div>`;
+    }
+    const pctDown = Math.round((100 - pctUp) * 10) / 10;
+    return `
+      <div class="prob-row">
+        <span class="prob-asset">${assetLabel}</span>
+        <span class="prob-side prob-up"><span class="prob-arrow">⬆️</span>Alta <b>${pctUp}%</b></span>
+        <span class="prob-side prob-down"><span class="prob-arrow">⬇️</span>Baixa <b>${pctDown}%</b></span>
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="prob-card-head">Probabilidades para o dia</div>
+    ${row('Mini Dólar (WDO)', aggProbUsd)}
+    ${row('Mini Índice (WIN)', aggProbIbov)}
+    <p class="prob-warning">⚠️ Isso não é recomendação de operação — é estatística histórica.</p>`;
+}
+
 function scenarioLine(scenarioLabel, pctUsd, pctIbov, ciUsd, ciIbov) {
   function readoutInline(pctUp, ci) {
     if (pctUp === null || pctUp === undefined) return '—';
@@ -739,6 +769,7 @@ async function loadDailySummary(dateStr) {
     head.textContent = `Resumo de ${isToday ? 'hoje' : 'dia'} (${dateLabel}): ${sorted.length} indicador(es) programado(s)`;
 
     let weightedSum = 0, weightTotal = 0;
+    let weightedSumIbov = 0, weightTotalIbov = 0;
     itemsEl.innerHTML = sorted.map(ind => {
       const s = statsMap[ind.id];
       const flag = countryFlag(ind.country);
@@ -752,6 +783,11 @@ async function loadDailySummary(dateStr) {
         if (prob !== null && prob !== undefined && (s.sample_size || 0) >= 5) {
           weightedSum += prob * s.sample_size;
           weightTotal += s.sample_size;
+        }
+        const probIbov = trend === 'up' ? s.pct_ibov_up_after_indicator_up : s.pct_ibov_up_after_indicator_down;
+        if (probIbov !== null && probIbov !== undefined && (s.sample_size || 0) >= 5) {
+          weightedSumIbov += probIbov * s.sample_size;
+          weightTotalIbov += s.sample_size;
         }
       }
 
@@ -783,6 +819,8 @@ async function loadDailySummary(dateStr) {
 
     /* Probabilidade agregada + conferência retroativa */
     const aggProb = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null;
+    const aggProbIbov = weightTotalIbov > 0 ? Math.round(weightedSumIbov / weightTotalIbov) : null;
+    renderTodayProbCard(aggProb, aggProbIbov);
 
     let usdIndId = null;
     try {
