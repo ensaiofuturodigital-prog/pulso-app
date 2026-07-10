@@ -1,8 +1,8 @@
-name: Fetch Overnight News
+name: Fetch News Radar
 
 on:
   schedule:
-    - cron: '55 10 * * *'  # todo dia às 10h55 UTC (7h55 Brasília)
+    - cron: '5 * * * *'  # de hora em hora (às 5min de cada hora), 24h por dia
   workflow_dispatch:
 
 jobs:
@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
-      - run: node scripts/fetch-overnight-news.js
+      - run: node scripts/fetch-news-radar.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

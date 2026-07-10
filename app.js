@@ -349,24 +349,30 @@ async function loadTimeline() {
   }
 }
 
-/* ---------------- RADAR: NOTÍCIAS DA MADRUGADA ---------------- */
+/* ---------------- RADAR: NOTÍCIAS DE MERCADO (24H) ---------------- */
 async function loadOvernightNews() {
   const list = document.getElementById('newsList');
   try {
     const { data, error } = await supabase
       .from('news')
       .select('*')
-      .eq('region', 'overnight')
-      .order('published_at', { ascending: false });
+      .eq('region', 'radar')
+      .order('published_at', { ascending: false })
+      .limit(60);
     if (error) throw error;
 
     if (!data || data.length === 0) {
-      list.innerHTML = '<p class="empty-note">Nenhuma notícia registrada na última varredura (18h–8h). O robô roda todo dia às 8h — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
+      list.innerHTML = '<p class="empty-note">Nenhuma notícia registrada ainda. O robô roda de hora em hora — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
       return;
     }
 
     list.innerHTML = data.map(n => {
-      const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date(n.published_at));
+      const newsDate = new Date(n.published_at);
+      const isToday = newsDate.toDateString() === new Date().toDateString();
+      const time = new Intl.DateTimeFormat('pt-BR', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+        ...(isToday ? {} : { day: '2-digit', month: '2-digit' }),
+      }).format(newsDate);
       return `
         <a class="news-row" href="${n.url}" target="_blank" rel="noopener">
           <span class="news-time">${time}</span>
