@@ -961,12 +961,14 @@ function renderHolidayCalendar() {
   const weekDayNames = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
   let cells = '';
+  const todayKey = dstr(new Date());
   for (let i = 0; i < firstDay; i++) cells += `<div class="cal-cell empty"></div>`;
   for (let day = 1; day <= daysInMonth; day++) {
     const dateObj = new Date(year, month, day);
     const key = dstr(dateObj);
     const h = holidays[key];
     let cls = 'cal-cell';
+    if (key === todayKey) cls += ' is-today';
     let tag = '';
     if (h?.br) { cls += ' is-br'; tag += `<span class="cal-tag br" title="${h.br}">BR</span>`; }
     if (h?.us) { cls += ' is-us'; tag += `<span class="cal-tag us" title="${h.us}">US</span>`; }
