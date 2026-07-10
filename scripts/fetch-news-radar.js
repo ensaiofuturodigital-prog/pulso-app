@@ -30,6 +30,8 @@ const EXCLUDE_KEYWORDS = [
   'novela', 'bbb', 'big brother', 'reality show', 'celebridade', 'famosos', 'famoso ', 'famosa ',
   'grammy', 'oscar', 'cantor', 'cantora', 'ator ', 'atriz', 'horóscopo', 'receita de', 'signo',
   'namoro', 'affair', 'clima tempo', 'previsão do tempo',
+  'loteria', 'loterias', 'lotofácil', 'lotofacil', 'mega-sena', 'megasena', 'quina', 'lotomania',
+  'dupla sena', 'timemania', 'loteca', 'dezenas sorteadas', 'resultado do sorteio',
 ];
 
 // Palavras que confirmam que é conteúdo de mercado/economia (usado pra
