@@ -76,6 +76,16 @@ async function run() {
       const observations = await fetchBcbSeries(serie.code);
       if (observations.length === 0) { console.log(`⚠️  ${serie.series_id}: nenhum dado retornado`); continue; }
 
+      const { data: prevLatestRows } = await supabase
+        .from('indicator_releases')
+        .select('release_date')
+        .eq('indicator_id', indicatorId)
+        .order('release_date', { ascending: false })
+        .limit(1);
+      const prevLatestDate = prevLatestRows && prevLatestRows[0] ? prevLatestRows[0].release_date : null;
+      const newestObsDate = observations[observations.length - 1].date;
+      const isFreshRelease = newestObsDate !== prevLatestDate;
+
       const rows = observations.map((obs, i) => ({
         indicator_id: indicatorId,
         release_date: obs.date,
@@ -86,6 +96,13 @@ async function run() {
       for (const batch of chunk(rows, 500)) {
         const { error } = await supabase.from('indicator_releases').upsert(batch, { onConflict: 'indicator_id,release_date' });
         if (error) console.error(`Erro no lote de ${serie.series_id}:`, error.message);
+      }
+
+      if (isFreshRelease) {
+        await supabase.from('indicator_releases')
+          .update({ fetched_at: new Date().toISOString() })
+          .eq('indicator_id', indicatorId).eq('release_date', newestObsDate);
+        console.log(`🆕 ${serie.series_id}: divulgação nova detectada (${newestObsDate})`);
       }
 
       console.log(`✅ ${serie.series_id}: ${rows.length} pontos históricos (desde ${observations[0].date} até ${observations[observations.length - 1].date})`);

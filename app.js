@@ -744,6 +744,7 @@ async function loadDailySummary(dateStr) {
       const flag = countryFlag(ind.country);
       const time = ind.typical_time_brt ? ` · por volta das ${ind.typical_time_brt}` : '';
       const rel = releaseByIndicator[ind.id];
+      const releasedToday = !!(isToday && rel && rel.fetched_at && new Date(rel.fetched_at).toDateString() === new Date().toDateString());
       const trend = rel ? trendClass(rel.actual_value, rel.previous_value) : 'flat';
 
       if (s && trend !== 'flat') {
@@ -754,11 +755,25 @@ async function loadDailySummary(dateStr) {
         }
       }
 
-      const scenarios = s
-        ? `<span class="conf-badge ${confidenceLabel(s.sample_size).cls}">${confidenceLabel(s.sample_size).text} · ${s.sample_size} divulgações</span>` +
-          scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up) +
-          scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)
-        : '<p class="stats-empty">Sem amostra histórica suficiente ainda.</p>';
+      let scenarios;
+      if (releasedToday && s && trend !== 'flat') {
+        // Já saiu hoje: mostra só o cenário que de fato aconteceu, resolvido.
+        const ciUsd = trend === 'up' ? s.confidence?.usd_up : s.confidence?.usd_down;
+        const ciIbov = trend === 'up' ? s.confidence?.ibov_up : s.confidence?.ibov_down;
+        const pctUsd = trend === 'up' ? s.pct_usd_up_after_indicator_up : s.pct_usd_up_after_indicator_down;
+        const pctIbov = trend === 'up' ? s.pct_ibov_up_after_indicator_up : s.pct_ibov_up_after_indicator_down;
+        scenarios =
+          `<span class="conf-badge released-badge">✅ Saiu: veio ${trend === 'up' ? 'ACIMA' : 'ABAIXO'} do anterior (${fmtNum(rel.actual_value)} vs. ${fmtNum(rel.previous_value)})</span>` +
+          scenarioLine(`Nova leitura pra hoje`, pctUsd, pctIbov, ciUsd, ciIbov);
+      } else if (releasedToday && (!s || trend === 'flat')) {
+        scenarios = `<span class="conf-badge released-badge">✅ Saiu hoje (${fmtNum(rel.actual_value)}), sem variação relevante ou sem amostra histórica.</span>`;
+      } else {
+        scenarios = s
+          ? `<span class="conf-badge ${confidenceLabel(s.sample_size).cls}">⏳ Ainda não saiu · ${confidenceLabel(s.sample_size).text} · ${s.sample_size} divulgações</span>` +
+            scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up) +
+            scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)
+          : '<p class="stats-empty">⏳ Ainda não saiu · sem amostra histórica suficiente ainda.</p>';
+      }
       return `
         <div class="summary-item">
           <div class="summary-item-head">${flag} <b>${ind.name_pt}</b> ${importanceBadge(ind.importance)}${time}</div>

@@ -848,6 +848,7 @@ button, input, select {
 .conf-badge.conf-high { color: var(--teal); background: var(--teal-dim); }
 .conf-badge.conf-mid { color: var(--amber); background: rgba(242,184,75,0.14); }
 .conf-badge.conf-low { color: var(--coral); background: var(--coral-dim); }
+.conf-badge.released-badge { color: var(--teal); background: var(--teal-dim); border: 1px solid rgba(63,203,149,0.4); }
 
 /* ---------- TICKER DE CORRELACIONADOS ---------- */
 .ticker-strip {

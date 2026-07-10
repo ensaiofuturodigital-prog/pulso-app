@@ -120,6 +120,19 @@ async function run() {
 
       if (observations.length === 0) { console.log(`⚠️  ${ind.code}: nenhum dado retornado`); continue; }
 
+      // Antes de sobrescrever, verifica qual era a observação mais recente que já
+      // tínhamos, pra saber se a mais nova de agora é realmente inédita (ou seja,
+      // "acabou de sair"). É isso que alimenta o selo "✅ Saiu hoje" no site.
+      const { data: prevLatestRows } = await supabase
+        .from('indicator_releases')
+        .select('release_date')
+        .eq('indicator_id', indicatorId)
+        .order('release_date', { ascending: false })
+        .limit(1);
+      const prevLatestDate = prevLatestRows && prevLatestRows[0] ? prevLatestRows[0].release_date : null;
+      const newestObsDate = observations[observations.length - 1].date;
+      const isFreshRelease = newestObsDate !== prevLatestDate;
+
       const rows = observations.map((obs, i) => ({
         indicator_id: indicatorId,
         release_date: obs.date,
@@ -130,6 +143,14 @@ async function run() {
       for (const batch of chunk(rows, 500)) {
         const { error } = await supabase.from('indicator_releases').upsert(batch, { onConflict: 'indicator_id,release_date' });
         if (error) console.error(`Erro no lote de ${ind.code}:`, error.message);
+      }
+
+      // Update separado e pontual, só nessa linha — não mexe no resto do histórico.
+      if (isFreshRelease) {
+        await supabase.from('indicator_releases')
+          .update({ fetched_at: new Date().toISOString() })
+          .eq('indicator_id', indicatorId).eq('release_date', newestObsDate);
+        console.log(`🆕 ${ind.code}: divulgação nova detectada (${newestObsDate})`);
       }
 
       const fonte = ind.source_override === 'eurostat' ? 'Eurostat' : 'FRED';

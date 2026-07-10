@@ -2,7 +2,8 @@ name: Fetch FRED Data
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # todo dia às 10h UTC (7h Brasília)
+    - cron: '0 10 * * *'          # rodada principal: 10h UTC (7h Brasília)
+    - cron: '0,30 11-16 * * 1-5'  # pós-divulgação: de 30 em 30 min, 8h-13h Brasília, dias úteis
   workflow_dispatch:
 
 jobs:
