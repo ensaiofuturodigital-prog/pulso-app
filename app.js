@@ -323,12 +323,21 @@ async function loadTimeline() {
       return;
     }
 
+    // Séries contínuas (ex: Selic, taxas do BCE) ficam disponíveis todo dia mesmo sem
+    // uma divulgação nova de verdade — só mostra quando o valor realmente mudou.
+    const changedReleases = releases.filter(rel => rel.previous_value === null || rel.actual_value !== rel.previous_value);
+
+    if (changedReleases.length === 0) {
+      list.innerHTML = '<p class="empty-note">Nenhuma divulgação registrada ainda.</p>';
+      return;
+    }
+
     const indMap = {};
     (indicators || []).forEach(i => indMap[i.id] = i);
 
     let html = '';
     let currentDay = '';
-    releases.forEach(rel => {
+    changedReleases.forEach(rel => {
       const ind = indMap[rel.indicator_id] || {};
       const dayKey = rel.release_date;
       if (dayKey !== currentDay) {
@@ -685,23 +694,28 @@ function renderTodayProbCard(aggProbUsd, aggProbIbov) {
   const el = document.getElementById('todayProbCard');
   if (!el) return;
 
-  function row(assetLabel, pctUp) {
+  const arrowUp = `<svg class="prob-icon" viewBox="0 0 24 24" fill="none"><path d="M12 4L20 16H4L12 4Z" fill="currentColor"/></svg>`;
+  const arrowDown = `<svg class="prob-icon" viewBox="0 0 24 24" fill="none"><path d="M12 20L4 8H20L12 20Z" fill="currentColor"/></svg>`;
+
+  function block(assetLabel, pctUp) {
     if (pctUp === null || pctUp === undefined) {
-      return `<div class="prob-row"><span class="prob-asset">${assetLabel}</span><span class="prob-empty">sem dado suficiente pra hoje</span></div>`;
+      return `<div class="prob-block"><span class="prob-asset">${assetLabel}</span><span class="prob-empty">sem dado suficiente pra hoje</span></div>`;
     }
     const pctDown = Math.round((100 - pctUp) * 10) / 10;
     return `
-      <div class="prob-row">
+      <div class="prob-block">
         <span class="prob-asset">${assetLabel}</span>
-        <span class="prob-side prob-up"><span class="prob-arrow">⬆️</span>Alta <b>${pctUp}%</b></span>
-        <span class="prob-side prob-down"><span class="prob-arrow">⬇️</span>Baixa <b>${pctDown}%</b></span>
+        <div class="prob-line prob-up"><span class="prob-label">Alta</span><span class="prob-value">${pctUp}%</span>${arrowUp}</div>
+        <div class="prob-line prob-down"><span class="prob-label">Baixa</span><span class="prob-value">${pctDown}%</span>${arrowDown}</div>
       </div>`;
   }
 
   el.innerHTML = `
     <div class="prob-card-head">Probabilidades para o dia</div>
-    ${row('Mini Dólar (WDO)', aggProbUsd)}
-    ${row('Mini Índice (WIN)', aggProbIbov)}
+    <div class="prob-blocks">
+      ${block('Mini Dólar (WDO)', aggProbUsd)}
+      ${block('Mini Índice (WIN)', aggProbIbov)}
+    </div>
     <p class="prob-warning">⚠️ Isso não é recomendação de operação — é estatística histórica.</p>`;
 }
 
@@ -766,7 +780,7 @@ async function loadDailySummary(dateStr) {
 
     const sorted = (indicators || []).sort((a, b) => (b.importance || 1) - (a.importance || 1));
 
-    head.textContent = `Resumo de ${isToday ? 'hoje' : 'dia'} (${dateLabel}): ${sorted.length} indicador(es) programado(s)`;
+    head.textContent = `Resumo de ${isToday ? 'hoje' : 'dia'} (${dateLabel})`;
 
     let weightedSum = 0, weightTotal = 0;
     let weightedSumIbov = 0, weightTotalIbov = 0;
@@ -851,8 +865,8 @@ async function loadDailySummary(dateStr) {
     let retroHtml = '';
     if (aggProb !== null) {
       retroHtml += `<div class="scenario-row" style="margin-bottom:10px">
-        <span class="scenario-label">Probabilidade histórica agregada do dia</span>
-        <span class="scenario-asset"><b>${aggProb}%</b> de chance histórica de alta do dólar nesse dia, combinando os indicadores acima — estatística do passado, não previsão.</span>
+        <span class="scenario-label">Probabilidade do dia</span>
+        <span class="scenario-asset"><b>${aggProb}%</b> de chance histórica de alta do dólar nesse dia, combinando os indicadores acima.</span>
       </div>`;
     }
     if (usdRelease) {

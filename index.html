@@ -73,8 +73,8 @@
       <!-- PAINEL -->
       <section class="panel is-active" id="panel-painel">
         <div class="panel-head">
-          <h1>Painel de indicadores</h1>
-          <p>Como o WDO e o WIN reagiram historicamente a cada indicador — contexto pra sua análise, não recomendação de operação.</p>
+          <h1>Painel do dia</h1>
+          <p>Como o WDO e o WIN reagiram historicamente a cada indicador.</p>
           <button type="button" class="btn-secondary" id="enablePushBtn" style="margin-top:12px;">🔔 Ativar aviso de eventos de alto impacto</button>
         </div>
 
@@ -90,9 +90,10 @@
               <button class="date-nav-btn date-today" id="dayToday" type="button">Hoje</button>
             </div>
             <div id="dailySummaryRetro"></div>
-            <div id="dailySummaryItems"></div>
           </div>
         </details>
+
+        <div class="timeline" id="dailySummaryItems"></div>
 
         <div class="importance-filter" id="importanceFilter">
           <span class="filter-label">Mostrar:</span>
@@ -114,8 +115,6 @@
       <section class="panel" id="panel-calendario">
         <div class="panel-head">
           <h1>Calendário econômico</h1>
-          <p>Próximos eventos com consenso de mercado (widget gratuito da Investing.com, só Brasil/EUA/Zona do Euro) e, abaixo, o histórico do que já foi divulgado no nosso banco.</p>
-          <p class="date-caveat">⚠️ Nas datas do histórico abaixo: para dados mensais dos EUA, a data mostrada é o <em>mês de referência</em> (ex: dado de maio), não necessariamente o dia exato do anúncio — essa correção ainda está pendente.</p>
         </div>
 
         <div class="widget-frame">
@@ -124,7 +123,7 @@
           <p class="widget-credit">Widget oficial e gratuito da <a href="https://www.investing.com" target="_blank" rel="noopener">Investing.com</a>, filtrado só pra Brasil, EUA e Zona do Euro.</p>
         </div>
 
-        <h2 class="section-subhead">Histórico registrado (nosso banco)</h2>
+        <h2 class="section-subhead">Indicadores econômicos</h2>
         <div class="timeline" id="calendarList">
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
