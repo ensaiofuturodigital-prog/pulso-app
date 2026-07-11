@@ -155,9 +155,10 @@ function importanceBadge(n) {
   if (lvl === 2) return `<span class="impact-badge imp-2">Impacto moderado</span>`;
   return `<span class="impact-badge imp-1">Baixo impacto</span>`;
 }
-function confidenceLabel(sampleSize) {
-  if (sampleSize >= 30) return { text: 'Confiança alta', cls: 'conf-high' };
-  if (sampleSize >= 12) return { text: 'Confiança média', cls: 'conf-mid' };
+function confidenceLabel(sampleSize, level) {
+  const lvl = level || (sampleSize >= 30 ? 'alta' : sampleSize >= 12 ? 'media' : 'baixa');
+  if (lvl === 'alta') return { text: 'Confiança alta', cls: 'conf-high' };
+  if (lvl === 'media') return { text: 'Confiança média', cls: 'conf-mid' };
   return { text: 'Confiança baixa — usar com cautela', cls: 'conf-low' };
 }
 function sparklineSvg(points, trend) {
@@ -220,14 +221,17 @@ async function loadIndicators() {
     (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
 
     function readout(pctUp, ci) {
-      if (pctUp === null || pctUp === undefined) return { arrow: '—', label: 'sem dado', cls: 'flat', pct: '—', range: '' };
+      if (pctUp === null || pctUp === undefined) return { arrow: '—', label: 'sem dado', cls: 'flat', pct: '—', range: '', title: '' };
       const hasCi = ci && ci.ci_low !== null && ci.ci_low !== undefined && ci.ci_high !== null && ci.ci_high !== undefined;
+      const sig = ci && ci.p_valor !== undefined && ci.p_valor !== null
+        ? (ci.significativo ? `Diferença estatisticamente significativa (p=${ci.p_valor}) — pouco provável ser só acaso.` : `Diferença não é estatisticamente significativa (p=${ci.p_valor}) — pode ser acaso.`)
+        : '';
       if (pctUp >= 50) {
         const range = hasCi ? ` (${fmtNum(ci.ci_low)}–${fmtNum(ci.ci_high)}%)` : '';
-        return { arrow: '▲', label: 'tende a SUBIR', cls: 'up', pct: pctUp, range };
+        return { arrow: '▲', label: 'tende a SUBIR', cls: 'up', pct: pctUp, range, title: sig };
       }
       const range = hasCi ? ` (${fmtNum(Math.round((100 - ci.ci_high) * 10) / 10)}–${fmtNum(Math.round((100 - ci.ci_low) * 10) / 10)}%)` : '';
-      return { arrow: '▼', label: 'tende a CAIR', cls: 'down', pct: Math.round((100 - pctUp) * 10) / 10, range };
+      return { arrow: '▼', label: 'tende a CAIR', cls: 'down', pct: Math.round((100 - pctUp) * 10) / 10, range, title: sig };
     }
 
     function scenarioRow(scenarioLabel, pctUsd, pctIbov, ciUsd, ciIbov) {
@@ -236,8 +240,8 @@ async function loadIndicators() {
       return `
         <div class="scenario-row">
           <span class="scenario-label">${scenarioLabel}</span>
-          <span class="scenario-asset"><b>WDO</b> <span class="arrow ${wdo.cls}">${wdo.arrow}</span> ${wdo.label} <b>${wdo.pct}%</b><span class="ci-range">${wdo.range}</span></span>
-          <span class="scenario-asset"><b>WIN</b> <span class="arrow ${win.cls}">${win.arrow}</span> ${win.label} <b>${win.pct}%</b><span class="ci-range">${win.range}</span></span>
+          <span class="scenario-asset" title="${wdo.title}"><b>WDO</b> <span class="arrow ${wdo.cls}">${wdo.arrow}</span> ${wdo.label} <b>${wdo.pct}%</b><span class="ci-range">${wdo.range}</span></span>
+          <span class="scenario-asset" title="${win.title}"><b>WIN</b> <span class="arrow ${win.cls}">${win.arrow}</span> ${win.label} <b>${win.pct}%</b><span class="ci-range">${win.range}</span></span>
         </div>`;
     }
 
@@ -247,7 +251,7 @@ async function loadIndicators() {
         return `<details class="ind-stats"><summary>Ver probabilidade histórica</summary>
           <p class="stats-empty">Ainda sem amostra suficiente pra esse indicador.</p></details>`;
       }
-      const conf = confidenceLabel(s.sample_size);
+      const conf = confidenceLabel(s.sample_size, s.confidence?.usd_up?.level);
       const alertHtml = s.alert_text ? `<p class="alert-banner">⚠️ ${s.alert_text}</p>` : '';
       return `<details class="ind-stats"><summary>Ver probabilidade histórica (${s.sample_size} divulgações)</summary>
         <span class="conf-badge ${conf.cls}">${conf.text}</span>
@@ -819,7 +823,7 @@ async function loadDailySummary(dateStr) {
         scenarios = `<span class="conf-badge released-badge">✅ Saiu hoje (${fmtNum(rel.actual_value)}), sem variação relevante ou sem amostra histórica.</span>`;
       } else {
         scenarios = s
-          ? `<span class="conf-badge ${confidenceLabel(s.sample_size).cls}">⏳ Ainda não saiu · ${confidenceLabel(s.sample_size).text} · ${s.sample_size} divulgações</span>` +
+          ? `<span class="conf-badge ${confidenceLabel(s.sample_size, s.confidence?.usd_up?.level).cls}">⏳ Ainda não saiu · ${confidenceLabel(s.sample_size, s.confidence?.usd_up?.level).text} · ${s.sample_size} divulgações</span>` +
             scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up) +
             scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)
           : '<p class="stats-empty">⏳ Ainda não saiu · sem amostra histórica suficiente ainda.</p>';
