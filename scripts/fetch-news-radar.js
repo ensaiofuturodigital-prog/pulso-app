@@ -44,6 +44,22 @@ const FINANCE_KEYWORDS = [
   'pmi', 'varejo', 'consumidor', 'confiança', 'investidor', 'investidores', 'cotação', 'moeda',
 ];
 
+// Classifica região pra filtro no site (BR/US/EA/CN/JP/GLOBAL).
+const REGION_RULES = [
+  { tag: 'BR', words: ['brasil', 'brasileiro', 'brasileira', 'copom', 'selic', 'ibovespa', 'bcb', 'banco central do brasil', 'real (moeda)', 'lula'] },
+  { tag: 'US', words: ['eua', 'estados unidos', 'fed', 'federal reserve', 'washington', 'wall street', 'nasdaq', 'dow jones', 'powell', 'dólar americano', 'casa branca'] },
+  { tag: 'EA', words: ['bce', 'zona do euro', 'europa', 'europeu', 'europeia', 'alemanha', 'frança', 'lagarde', 'euro '] },
+  { tag: 'CN', words: ['china', 'chinês', 'chinesa', 'pequim', 'yuan', 'pboc', 'xangai'] },
+  { tag: 'JP', words: ['japão', 'japonês', 'japonesa', 'tóquio', 'boj', 'iene'] },
+];
+function classifyRegion(title) {
+  const t = title.toLowerCase();
+  for (const rule of REGION_RULES) {
+    if (rule.words.some(w => t.includes(w))) return rule.tag;
+  }
+  return 'GLOBAL';
+}
+
 function passesFilter(title) {
   const t = title.toLowerCase();
   if (EXCLUDE_KEYWORDS.some(k => t.includes(k))) return false;
@@ -87,6 +103,7 @@ async function run() {
       url: i.url,
       impact_tag: null,
       region: 'radar',
+      country_tag: classifyRegion(i.title),
     }));
     // upsert por URL: roda de hora em hora, então evita duplicar quem já foi salvo.
     const { error } = await supabase.from('news').upsert(rows, { onConflict: 'url', ignoreDuplicates: true });

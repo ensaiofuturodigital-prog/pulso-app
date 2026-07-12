@@ -542,6 +542,7 @@ button, input, select {
   transition: all 0.15s;
 }
 .filter-btn.is-active { background: var(--gold); color: #1A1305; border-color: var(--gold); font-weight: 600; }
+.news-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
 
 /* ---------- WEEKLY SUMMARY ---------- */
 .weekly-summary { display: flex; flex-direction: column; gap: 6px; max-width: 640px; margin-bottom: 8px; }

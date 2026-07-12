@@ -369,6 +369,45 @@ async function loadTimeline() {
 }
 
 /* ---------------- RADAR: NOTÍCIAS DE MERCADO (24H) ---------------- */
+let newsCache = [];
+let newsRegionFilter = 'all';
+
+function renderNews() {
+  const list = document.getElementById('newsList');
+  const filtered = newsRegionFilter === 'all' ? newsCache : newsCache.filter(n => (n.country_tag || 'GLOBAL') === newsRegionFilter);
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<p class="empty-note">Nenhuma notícia nessa região por enquanto.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(n => {
+    const newsDate = new Date(n.published_at);
+    const isToday = newsDate.toDateString() === new Date().toDateString();
+    const time = new Intl.DateTimeFormat('pt-BR', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+      ...(isToday ? {} : { day: '2-digit', month: '2-digit' }),
+    }).format(newsDate);
+    return `
+      <a class="news-row" href="${n.url}" target="_blank" rel="noopener">
+        <span class="news-time">${time}</span>
+        <div class="news-body">
+          <div class="news-title">${n.title}</div>
+          <div class="news-source">${n.source}</div>
+        </div>
+      </a>`;
+  }).join('');
+}
+
+document.querySelectorAll('#newsFilters .filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#newsFilters .filter-btn').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    newsRegionFilter = btn.dataset.region;
+    renderNews();
+  });
+});
+
 async function loadOvernightNews() {
   const list = document.getElementById('newsList');
   try {
@@ -385,22 +424,8 @@ async function loadOvernightNews() {
       return;
     }
 
-    list.innerHTML = data.map(n => {
-      const newsDate = new Date(n.published_at);
-      const isToday = newsDate.toDateString() === new Date().toDateString();
-      const time = new Intl.DateTimeFormat('pt-BR', {
-        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
-        ...(isToday ? {} : { day: '2-digit', month: '2-digit' }),
-      }).format(newsDate);
-      return `
-        <a class="news-row" href="${n.url}" target="_blank" rel="noopener">
-          <span class="news-time">${time}</span>
-          <div class="news-body">
-            <div class="news-title">${n.title}</div>
-            <div class="news-source">${n.source}</div>
-          </div>
-        </a>`;
-    }).join('');
+    newsCache = data;
+    renderNews();
   } catch (err) {
     console.error(err);
     list.innerHTML = '<p class="empty-note">Não consegui carregar as notícias agora.</p>';
