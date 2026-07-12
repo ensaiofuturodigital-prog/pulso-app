@@ -149,6 +149,10 @@ function fmtDate(d) {
 function monthLabel(d) {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(d + 'T12:00:00'));
 }
+// BCB_USDBRL/IBOV são referências de mercado (não indicadores). DXY/Treasury/Petróleo
+// e CPI/HSP saíram do site a pedido. Usado pra filtrar qualquer lista de indicadores.
+const NON_DISPLAY_CODES = ['BCB_USDBRL', 'IBOV', 'DTWEXBGS', 'DGS10', 'DCOILWTICO', 'CPIAUCSL', 'HOUST', 'PERMIT'];
+
 function todayStrBR() {
   // en-CA formata como YYYY-MM-DD, o mesmo formato usado no banco
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
@@ -184,139 +188,6 @@ function sparklineSvg(points, trend) {
 }
 
 /* ---------------- INDICATORS PANEL ---------------- */
-async function loadIndicators() {
-  const grid = document.getElementById('indicatorsGrid');
-  try {
-    const { data: indicatorsRaw, error: indErr } = await supabase
-      .from('indicators')
-      .select('*')
-      .order('name_pt');
-    if (indErr) throw indErr;
-    // BCB_USDBRL e IBOV são referências de mercado usadas nos cálculos, não indicadores em si.
-    // DXY/T-Note/Petróleo viram o ticker de correlacionados no topo, em vez de card normal.
-    const TICKER_CODES = ['DTWEXBGS', 'DGS10', 'DCOILWTICO'];
-    // Removidos a pedido: CPI (já coberto pelo Núcleo do CPI) e HSP - Housing Starts/Permits (HOUST, PERMIT)
-    const HIDDEN_CODES = ['CPIAUCSL', 'HOUST', 'PERMIT'];
-    const indicators = (indicatorsRaw || []).filter(i =>
-      i.code !== 'BCB_USDBRL' && i.code !== 'IBOV' && !TICKER_CODES.includes(i.code) && !HIDDEN_CODES.includes(i.code)
-    );
-
-    // Só mostra quem está agendado pra hoje (qualquer relevância: baixa, média ou alta).
-    const todayStr = todayStrBR();
-    const { data: todaySchedule } = await supabase.from('release_schedule').select('indicator_id').eq('release_date', todayStr);
-    const todayIds = new Set((todaySchedule || []).map(s => s.indicator_id));
-    const indicatorsToday = indicators.filter(i => todayIds.has(i.id));
-
-    if (indicatorsToday.length === 0) {
-      grid.innerHTML = '<p class="empty-note">Nenhum indicador programado pra hoje, pelo calendário do FRED. Veja outros dias na aba Calendário.</p>';
-      return;
-    }
-
-    const releasesByIndicator = {};
-    await Promise.all(indicatorsToday.map(async (ind) => {
-      const { data } = await supabase
-        .from('indicator_releases')
-        .select('*')
-        .eq('indicator_id', ind.id)
-        .order('release_date', { ascending: false })
-        .limit(12);
-      releasesByIndicator[ind.id] = (data || []).reverse(); // volta pra ordem crescente
-    }));
-
-    const { data: statsRows } = await supabase.from('indicator_stats').select('*');
-    const statsMap = {};
-    (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
-
-    function readout(pctUp, ci) {
-      if (pctUp === null || pctUp === undefined) return { arrow: '—', label: 'sem dado', cls: 'flat', pct: '—', range: '', title: '' };
-      const hasCi = ci && ci.ci_low !== null && ci.ci_low !== undefined && ci.ci_high !== null && ci.ci_high !== undefined;
-      const sig = ci && ci.p_valor !== undefined && ci.p_valor !== null
-        ? (ci.significativo ? `Diferença estatisticamente significativa (p=${ci.p_valor}) — pouco provável ser só acaso.` : `Diferença não é estatisticamente significativa (p=${ci.p_valor}) — pode ser acaso.`)
-        : '';
-      if (pctUp >= 50) {
-        const range = hasCi ? ` (${fmtNum(ci.ci_low)}–${fmtNum(ci.ci_high)}%)` : '';
-        return { arrow: '▲', label: 'tende a SUBIR', cls: 'up', pct: pctUp, range, title: sig };
-      }
-      const range = hasCi ? ` (${fmtNum(Math.round((100 - ci.ci_high) * 10) / 10)}–${fmtNum(Math.round((100 - ci.ci_low) * 10) / 10)}%)` : '';
-      return { arrow: '▼', label: 'tende a CAIR', cls: 'down', pct: Math.round((100 - pctUp) * 10) / 10, range, title: sig };
-    }
-
-    function scenarioRow(scenarioLabel, pctUsd, pctIbov, ciUsd, ciIbov) {
-      const wdo = readout(pctUsd, ciUsd);
-      const win = readout(pctIbov, ciIbov);
-      return `
-        <div class="scenario-row">
-          <span class="scenario-label">${scenarioLabel}</span>
-          <span class="scenario-asset" title="${wdo.title}"><b>WDO</b> <span class="arrow ${wdo.cls}">${wdo.arrow}</span> ${wdo.label} <b>${wdo.pct}%</b><span class="ci-range">${wdo.range}</span></span>
-          <span class="scenario-asset" title="${win.title}"><b>WIN</b> <span class="arrow ${win.cls}">${win.arrow}</span> ${win.label} <b>${win.pct}%</b><span class="ci-range">${win.range}</span></span>
-        </div>`;
-    }
-
-    function statsPanel(ind) {
-      const s = statsMap[ind.id];
-      if (!s) {
-        return `<details class="ind-stats"><summary>Ver probabilidade histórica</summary>
-          <p class="stats-empty">Ainda sem amostra suficiente pra esse indicador.</p></details>`;
-      }
-      const conf = confidenceLabel(s.sample_size, s.confidence?.usd_up?.level);
-      const alertHtml = s.alert_text ? `<p class="alert-banner">⚠️ ${s.alert_text}</p>` : '';
-      return `<details class="ind-stats"><summary>Ver probabilidade histórica (${s.sample_size} divulgações)</summary>
-        <span class="conf-badge ${conf.cls}">${conf.text}</span>
-        ${alertHtml}
-        ${scenarioRow('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up)}
-        ${scenarioRow('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)}
-        <p class="stats-period">Baseado no histórico de ${fmtDate(s.first_date)} até ${fmtDate(s.last_date)}. O número entre parênteses é a faixa provável real (intervalo de confiança de 95%) — quanto menor a amostra, mais larga a faixa. WIN estimado via Ibovespa (proxy gratuito). Não é garantia de repetição — é o que aconteceu no passado.</p>
-      </details>`;
-    }
-
-    grid.innerHTML = '';
-    indicatorsToday.forEach(ind => {
-      const indReleases = releasesByIndicator[ind.id] || [];
-      const rel = indReleases[indReleases.length - 1];
-      const flag = countryFlag(ind.country);
-      const card = document.createElement('div');
-      card.className = 'ind-card';
-      card.dataset.importance = ind.importance || 1;
-
-      if (!rel) {
-        card.innerHTML = `
-          <div class="ind-card-top">
-            <div><div class="ind-name">${flag} ${ind.name_pt}</div><div class="ind-code">${ind.code}</div></div>
-          </div>
-          <p class="ind-desc">${ind.description_pt || ''}</p>
-          <p class="ind-date">Sem divulgação registrada ainda</p>`;
-        grid.appendChild(card);
-        return;
-      }
-
-      const trend = trendClass(rel.actual_value, rel.previous_value);
-      const mag = pctMagnitude(rel.actual_value, rel.previous_value);
-      const badgeText = trend === 'up' ? '▲ subiu' : trend === 'down' ? '▼ caiu' : '— estável';
-      const spark = sparklineSvg(indReleases, trend);
-      card.dataset.importance = ind.importance || 1;
-
-      card.innerHTML = `
-        <div class="ind-card-top">
-          <div><div class="ind-name">${flag} ${ind.name_pt}</div><div class="ind-code">${ind.code} · ${ind.frequency || ''}</div></div>
-          <div class="ind-badges"><span class="ind-badge ${trend}">${badgeText}</span>${importanceBadge(ind.importance)}</div>
-        </div>
-        <div class="ind-values">
-          <span class="ind-value">${fmtNum(rel.actual_value)}</span>
-          <span class="ind-prev">ant. ${fmtNum(rel.previous_value)}</span>
-          ${spark}
-        </div>
-        <div class="pulse-bar"><div class="pulse-bar-fill ${trend}" style="width:${mag}%"></div></div>
-        <p class="ind-desc">${ind.description_pt || ''}</p>
-        <p class="ind-date">Divulgado em ${fmtDate(rel.release_date)}</p>
-        ${statsPanel(ind)}`;
-      grid.appendChild(card);
-    });
-  } catch (err) {
-    console.error(err);
-    grid.innerHTML = '<p class="empty-note">Não consegui carregar os indicadores agora. Verifique a conexão com o Supabase.</p>';
-  }
-}
-
 /* ---------------- CALENDAR / TIMELINE PANEL ---------------- */
 async function loadTimeline() {
   const list = document.getElementById('calendarList');
@@ -819,8 +690,14 @@ async function loadDailySummary(dateStr) {
     }
 
     const ids = scheduled.map(s => s.indicator_id);
-    const { data: indicators } = await supabase.from('indicators').select('*').in('id', ids);
-    const { data: statsRows } = await supabase.from('indicator_stats').select('*').in('indicator_id', ids);
+    const { data: indicatorsRaw } = await supabase.from('indicators').select('*').in('id', ids);
+    const indicators = (indicatorsRaw || []).filter(i => !NON_DISPLAY_CODES.includes(i.code));
+    if (indicators.length === 0) {
+      head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+      itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
+      return;
+    }
+    const { data: statsRows } = await supabase.from('indicator_stats').select('*').in('indicator_id', indicators.map(i => i.id));
     const statsMap = {};
     (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
 
@@ -1116,20 +993,7 @@ function renderHolidayCalendar() {
   document.getElementById('calNext').addEventListener('click', () => { calState.setMonth(calState.getMonth() + 1); renderHolidayCalendar(); });
 }
 
-document.querySelectorAll('#importanceFilter .filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#importanceFilter .filter-btn').forEach(b => b.classList.remove('is-active'));
-    btn.classList.add('is-active');
-    const min = parseInt(btn.dataset.min, 10);
-    document.querySelectorAll('#indicatorsGrid .ind-card').forEach(card => {
-      const imp = parseInt(card.dataset.importance || '1', 10);
-      card.style.display = imp >= min ? '' : 'none';
-    });
-  });
-});
-
 /* ---------------- INIT ---------------- */
-loadIndicators();
 // loadTicker(); // removido a pedido: DXY/Treasury/Petróleo não aparecem mais no topo
 loadLastUpdate();
 loadTimeline();
