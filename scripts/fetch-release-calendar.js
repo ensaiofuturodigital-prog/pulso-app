@@ -50,7 +50,22 @@ async function run() {
       const dates = await getReleaseDates(releaseId);
       if (dates.length === 0) { console.log(`⚠️  ${ind.code}: nenhuma data retornada`); continue; }
 
-      const rows = dates.map(d => ({ indicator_id: ind.id, release_date: d }));
+      // Sanidade: dado econômico nunca sai em fim de semana. Se aparecer, é sinal de
+      // release_id errado/misturado na fonte — melhor descartar essa data específica
+      // do que mostrar algo impossível no site.
+      let validDates = dates.filter(d => {
+        const dow = new Date(d + 'T12:00:00').getDay();
+        return dow !== 0 && dow !== 6;
+      });
+      // Caso conhecido: ICSA (Pedidos de Seguro-Desemprego) só sai às quintas-feiras.
+      // A fonte às vezes mistura outro release e traz segundas soltas.
+      if (ind.code === 'ICSA') {
+        validDates = validDates.filter(d => new Date(d + 'T12:00:00').getDay() === 4);
+      }
+      const skipped = dates.length - validDates.length;
+      if (skipped > 0) console.log(`   ⏭️  ${ind.code}: ${skipped} data(s) em fim de semana descartada(s)`);
+
+      const rows = validDates.map(d => ({ indicator_id: ind.id, release_date: d }));
       for (const batch of chunk(rows, 500)) {
         const { error } = await supabase.from('release_schedule').upsert(batch, { onConflict: 'indicator_id,release_date' });
         if (error) console.error(`Erro no lote de ${ind.code}:`, error.message);
