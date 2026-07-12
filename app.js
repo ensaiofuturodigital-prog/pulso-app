@@ -369,44 +369,44 @@ async function loadTimeline() {
 }
 
 /* ---------------- RADAR: NOTÍCIAS DE MERCADO (24H) ---------------- */
-let newsCache = [];
-let newsRegionFilter = 'all';
+const BREAKING_KEYWORDS = [
+  'atentado', 'morte', 'morreu', 'faleceu', 'guerra', 'ataque', 'acidente', 'renúncia', 'renuncia',
+  'golpe', 'declaração de guerra', 'terremoto', 'tsunami', 'crise', 'assassinato', 'explosão', 'explosao',
+  'incêndio', 'incendio', 'sequestro', 'rendição', 'rendicao', 'anúncio emergencial', 'anuncio emergencial',
+  'colapso', 'pânico', 'panico',
+];
+function isBreaking(title) {
+  const t = title.toLowerCase();
+  return BREAKING_KEYWORDS.some(k => t.includes(k));
+}
 
 function renderNews() {
   const list = document.getElementById('newsList');
-  const filtered = newsRegionFilter === 'all' ? newsCache : newsCache.filter(n => (n.country_tag || 'GLOBAL') === newsRegionFilter);
-
-  if (filtered.length === 0) {
-    list.innerHTML = '<p class="empty-note">Nenhuma notícia nessa região por enquanto.</p>';
+  if (newsCache.length === 0) {
+    list.innerHTML = '<p class="empty-note">Nenhuma notícia registrada ainda. O robô roda de hora em hora — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
     return;
   }
 
-  list.innerHTML = filtered.map(n => {
+  list.innerHTML = newsCache.map(n => {
     const newsDate = new Date(n.published_at);
     const isToday = newsDate.toDateString() === new Date().toDateString();
     const time = new Intl.DateTimeFormat('pt-BR', {
       hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
       ...(isToday ? {} : { day: '2-digit', month: '2-digit' }),
     }).format(newsDate);
+    const breaking = isBreaking(n.title);
     return `
-      <a class="news-row" href="${n.url}" target="_blank" rel="noopener">
+      <a class="news-row ${breaking ? 'is-breaking' : ''}" href="${n.url}" target="_blank" rel="noopener">
         <span class="news-time">${time}</span>
         <div class="news-body">
-          <div class="news-title">${n.title}</div>
+          <div class="news-title">${breaking ? '<span class="breaking-tag">BREAKING</span> ' : ''}${n.title}</div>
           <div class="news-source">${n.source}</div>
         </div>
       </a>`;
   }).join('');
 }
 
-document.querySelectorAll('#newsFilters .filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#newsFilters .filter-btn').forEach(b => b.classList.remove('is-active'));
-    btn.classList.add('is-active');
-    newsRegionFilter = btn.dataset.region;
-    renderNews();
-  });
-});
+let newsCache = [];
 
 async function loadOvernightNews() {
   const list = document.getElementById('newsList');
@@ -719,31 +719,46 @@ function renderPatterns(allTrades) {
 }
 
 
-function renderTodayProbCard(aggProbUsd, aggProbIbov) {
+function renderTodayProbCard(aggProbUsd, aggProbIbov, nUsd, nIbov) {
   const el = document.getElementById('todayProbCard');
   if (!el) return;
 
   const arrowUp = `<svg class="prob-icon" viewBox="0 0 24 24" fill="none"><path d="M12 4L20 16H4L12 4Z" fill="currentColor"/></svg>`;
   const arrowDown = `<svg class="prob-icon" viewBox="0 0 24 24" fill="none"><path d="M12 20L4 8H20L12 20Z" fill="currentColor"/></svg>`;
 
-  function block(assetLabel, pctUp) {
+  function confLabel(n) {
+    if (!n) return null;
+    if (n >= 30) return 'Alta';
+    if (n >= 10) return 'Média';
+    return 'Baixa';
+  }
+
+  function block(assetLabel, pctUp, n) {
     if (pctUp === null || pctUp === undefined) {
       return `<div class="prob-block"><span class="prob-asset">${assetLabel}</span><span class="prob-empty">sem dado suficiente pra hoje</span></div>`;
     }
     const pctDown = Math.round((100 - pctUp) * 10) / 10;
+    const conf = confLabel(n);
     return `
       <div class="prob-block">
         <span class="prob-asset">${assetLabel}</span>
-        <div class="prob-line prob-up"><span class="prob-label">Alta</span><span class="prob-value">${pctUp}%</span>${arrowUp}</div>
-        <div class="prob-line prob-down"><span class="prob-label">Baixa</span><span class="prob-value">${pctDown}%</span>${arrowDown}</div>
+        <div class="prob-line prob-up">
+          <span class="prob-label">Alta</span><span class="prob-value">${pctUp}%</span>${arrowUp}
+        </div>
+        <div class="prob-bar-track"><div class="prob-bar-fill prob-bar-up" style="width:${pctUp}%"></div></div>
+        <div class="prob-line prob-down">
+          <span class="prob-label">Baixa</span><span class="prob-value">${pctDown}%</span>${arrowDown}
+        </div>
+        <div class="prob-bar-track"><div class="prob-bar-fill prob-bar-down" style="width:${pctDown}%"></div></div>
+        ${conf ? `<div class="prob-meta">Confiança: <b>${conf}</b> · ${n} evento(s) histórico(s)</div>` : ''}
       </div>`;
   }
 
   el.innerHTML = `
     <div class="prob-card-head">Probabilidades para o dia</div>
     <div class="prob-blocks">
-      ${block('Mini Dólar (WDO)', aggProbUsd)}
-      ${block('Mini Índice (WIN)', aggProbIbov)}
+      ${block('Mini Dólar (WDO)', aggProbUsd, nUsd)}
+      ${block('Mini Índice (WIN)', aggProbIbov, nIbov)}
     </div>
     <p class="prob-warning">⚠️ Isso não é recomendação de operação — é estatística histórica.</p>`;
 }
@@ -782,7 +797,7 @@ async function loadDailySummary(dateStr) {
     if (error) throw error;
 
     if (!scheduled || scheduled.length === 0) {
-      head.textContent = `Resumo de ${isToday ? 'hoje' : 'dia'} (${dateLabel}): nenhum indicador de alto impacto programado`;
+      head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
       itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
       return;
     }
@@ -809,7 +824,7 @@ async function loadDailySummary(dateStr) {
 
     const sorted = (indicators || []).sort((a, b) => (b.importance || 1) - (a.importance || 1));
 
-    head.textContent = `Resumo de ${isToday ? 'hoje' : 'dia'} (${dateLabel})`;
+    head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
 
     let weightedSum = 0, weightTotal = 0;
     let weightedSumIbov = 0, weightTotalIbov = 0;
@@ -858,12 +873,12 @@ async function loadDailySummary(dateStr) {
           <div class="summary-item-head">${flag} <b>${ind.name_pt}</b> ${importanceBadge(ind.importance)}${time}</div>
           ${scenarios}
         </div>`;
-    }).join('');
+    }).filter((_, idx) => (sorted[idx].importance || 1) >= 2).join('') || '<p class="stats-empty">Só indicadores de baixa relevância hoje — nada de média/alta pra mostrar.</p>';
 
     /* Probabilidade agregada + conferência retroativa */
     const aggProb = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null;
     const aggProbIbov = weightTotalIbov > 0 ? Math.round(weightedSumIbov / weightTotalIbov) : null;
-    renderTodayProbCard(aggProb, aggProbIbov);
+    renderTodayProbCard(aggProb, aggProbIbov, weightTotal, weightTotalIbov);
 
     let usdIndId = null;
     try {
@@ -892,12 +907,6 @@ async function loadDailySummary(dateStr) {
     }
 
     let retroHtml = '';
-    if (aggProb !== null) {
-      retroHtml += `<div class="scenario-row" style="margin-bottom:10px">
-        <span class="scenario-label">Probabilidade do dia</span>
-        <span class="scenario-asset"><b>${aggProb}%</b> de chance histórica de alta do dólar nesse dia, combinando os indicadores acima.</span>
-      </div>`;
-    }
     if (usdRelease) {
       const actualTrend = trendClass(usdRelease.actual_value, usdRelease.previous_value);
       if (actualTrend !== 'flat' && aggProb !== null) {

@@ -42,6 +42,7 @@
       <span id="clockText">--:--</span>
       <span class="clock-label" id="sessionLabel">carregando sessão…</span>
       <span class="update-badge" id="lastUpdateBadge"></span>
+      <button type="button" class="bell-btn" id="enablePushBtn" title="Ativar aviso de eventos de alto impacto">🔔</button>
     </div>
   </header>
 
@@ -55,7 +56,7 @@
       </button>
       <button class="tab-btn" data-tab="calendario">
         <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3.5 9.5H20.5M8 3V6M16 3V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <span>Calendário</span>
+        <span>Calendário Econômico</span>
       </button>
       <button class="tab-btn" data-tab="radar">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12 L18 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -74,8 +75,6 @@
       <section class="panel is-active" id="panel-painel">
         <div class="panel-head">
           <h1>Painel do dia</h1>
-          <p>Como o WDO e o WIN reagiram historicamente a cada indicador.</p>
-          <button type="button" class="btn-secondary" id="enablePushBtn" style="margin-top:12px;">🔔 Ativar aviso de eventos de alto impacto</button>
         </div>
 
         <div class="prob-card" id="todayProbCard"></div>
@@ -119,7 +118,7 @@
 
         <div class="widget-frame">
           <iframe src="https://sslecal2.investing.com/?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone&countries=32,5,72&calType=week&timeZone=12&lang=12"
-            width="100%" height="480" frameborder="0" allowtransparency="true" title="Calendário econômico Investing.com" loading="lazy"></iframe>
+            width="100%" height="650" frameborder="0" allowtransparency="true" title="Calendário econômico Investing.com" loading="lazy"></iframe>
           <p class="widget-credit">Widget oficial e gratuito da <a href="https://www.investing.com" target="_blank" rel="noopener">Investing.com</a>, filtrado só pra Brasil, EUA e Zona do Euro.</p>
         </div>
 
@@ -134,15 +133,7 @@
       <section class="panel" id="panel-radar">
         <div class="panel-head">
           <h1>Radar de notícias</h1>
-          <p>Mercado e economia, 24 horas por dia — só o que pode mexer com dólar/índice nos EUA, China, Japão, Europa e Brasil. Sem fofoca, sem esporte.</p>
-        </div>
-        <div class="news-filters" id="newsFilters">
-          <button class="filter-btn is-active" data-region="all">🌍 Todos</button>
-          <button class="filter-btn" data-region="BR">🇧🇷 Brasil</button>
-          <button class="filter-btn" data-region="US">🇺🇸 EUA</button>
-          <button class="filter-btn" data-region="EA">🇪🇺 Europa</button>
-          <button class="filter-btn" data-region="CN">🇨🇳 China</button>
-          <button class="filter-btn" data-region="JP">🇯🇵 Japão</button>
+          <p>Notícias do mundo — mercado e economia, 24 horas por dia.</p>
         </div>
         <div class="news-list" id="newsList">
           <div class="skeleton-row"></div>

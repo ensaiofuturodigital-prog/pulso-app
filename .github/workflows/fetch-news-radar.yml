@@ -2,7 +2,7 @@ name: Fetch News Radar
 
 on:
   schedule:
-    - cron: '5 * * * *'  # de hora em hora (às 5min de cada hora), 24h por dia
+    - cron: '*/15 * * * *'  # de 15 em 15 minutos, 24h por dia
   workflow_dispatch:
 
 jobs:
