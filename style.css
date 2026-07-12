@@ -156,22 +156,26 @@ button, input, select {
   .tabs {
     position: static;
     flex-direction: column;
-    width: 200px;
+    width: 232px;
     border-top: none;
     border-right: 1px solid var(--border);
     padding: 24px 12px;
     align-items: stretch;
     justify-content: flex-start;
-    gap: 4px;
+    gap: 6px;
     background: transparent;
   }
   .tab-btn {
     flex-direction: row;
+    align-items: center;
     justify-content: flex-start;
-    gap: 12px;
-    padding: 10px 14px;
-    font-size: 16.5px;
+    gap: 14px;
+    padding: 12px 14px;
+    font-size: 17.5px;
+    font-weight: 500;
+    line-height: 1.25;
   }
+  .tab-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
   .tab-btn.is-active {
     background: var(--surface);
     color: var(--gold);
@@ -623,21 +627,21 @@ button, input, select {
 }
 .prob-line.prob-up { background: var(--teal-dim); }
 .prob-line.prob-down { background: var(--coral-dim); }
-.prob-label { font-size: 14px; font-weight: 500; color: var(--text-dim); width: 44px; }
-.prob-value { font-family: var(--font-mono); font-size: 20px; font-weight: 700; flex: 1; }
+.prob-label { font-size: 15.5px; font-weight: 600; color: var(--text-dim); width: 52px; }
+.prob-value { font-family: var(--font-mono); font-size: 24px; font-weight: 700; flex: 1; }
 .prob-line.prob-up .prob-value { color: var(--teal); }
 .prob-line.prob-down .prob-value { color: var(--coral); }
-.prob-icon { width: 22px; height: 22px; flex-shrink: 0; }
+.prob-icon { width: 26px; height: 26px; flex-shrink: 0; }
 .prob-line.prob-up .prob-icon { color: var(--teal); }
 .prob-line.prob-down .prob-icon { color: var(--coral); }
 .prob-empty { color: var(--text-faint); font-size: 13.5px; }
-.prob-warning { font-size: 12.5px; color: var(--text-faint); margin-top: 14px; }
+.prob-warning { font-size: 15px; font-weight: 600; color: var(--coral); margin-top: 14px; }
 .prob-bar-track { height: 6px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin: -2px 0 8px; }
 .prob-bar-fill { height: 100%; border-radius: 4px; }
 .prob-bar-fill.prob-bar-up { background: var(--teal); }
 .prob-bar-fill.prob-bar-down { background: var(--coral); }
-.prob-meta { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
-.prob-meta b { color: var(--text-dim); }
+.prob-meta { font-size: 14px; color: var(--text-dim); margin-top: 2px; }
+.prob-meta b { color: var(--text); }
 
 /* ---------- HOLIDAY CALENDAR ---------- */
 .calendar-legend-intro { font-size: 14px; color: var(--text-dim); margin: 0 0 12px; }
@@ -885,6 +889,10 @@ button, input, select {
 .retro-banner.retro-miss { border-color: var(--coral); background: var(--coral-dim); color: var(--text); }
 .retro-banner.retro-pending { color: var(--text-dim); }
 .retro-note { display: block; font-size: 12.5px; color: var(--text-faint); margin-top: 6px; font-weight: 400; }
+.price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
+.price-item { display: flex; flex-direction: column; gap: 2px; }
+.price-label { font-size: 12.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+.price-value { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: var(--text); }
 .ci-range { font-size: 12px; color: var(--text-faint); font-weight: 400; margin-left: 2px; }
 
 /* ---------- SELO DE CONFIABILIDADE ---------- */

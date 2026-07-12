@@ -101,17 +101,24 @@ setInterval(updateClock, 30000);
   const line = document.getElementById('pulseLine');
   if (!line) return;
   const W = 300, H = 40, MID = 20;
+  const CYCLE = 360; // 3 ciclos de 120: 2 planos, 1 com o batimento (espícula de EKG)
   let t = 0;
+  function heartbeatY(beat) {
+    // beat vai de 0 a 120 dentro do sub-ciclo em que o batimento acontece
+    if (beat < 6) return MID - beat * 0.4;                          // pequena subida (onda P)
+    if (beat < 10) return MID + (beat - 6) * 2.2;                    // descida rápida
+    if (beat < 15) return MID + 8.8 - (beat - 10) * 6.2;             // espícula alta (QRS)
+    if (beat < 19) return MID - 22 + (beat - 15) * 8.5;              // descida abaixo da base
+    if (beat < 24) return MID - 5 + (beat - 19) * 1;                 // reacomoda
+    return MID;                                                       // linha reta (onda T some)
+  }
   function frame() {
     let pts = [];
-    for (let x = 0; x <= W; x += 6) {
-      const phase = (x + t) * 0.05;
+    for (let x = 0; x <= W; x += 4) {
+      const pos = (x + t) % CYCLE;
       let y = MID;
-      const beat = ((x + t) % 120);
-      if (beat > 40 && beat < 70) {
-        y = MID - Math.sin(((beat - 40) / 30) * Math.PI) * 16;
-      } else {
-        y = MID + Math.sin(phase) * 1.5;
+      if (pos >= 240 && pos < 264) {
+        y = heartbeatY(pos - 240);
       }
       pts.push(`${x},${y.toFixed(1)}`);
     }
@@ -314,7 +321,7 @@ async function loadIndicators() {
 async function loadTimeline() {
   const list = document.getElementById('calendarList');
   try {
-    const { data: indicators } = await supabase.from('indicators').select('id,name_pt,country');
+    const { data: indicators } = await supabase.from('indicators').select('id,code,name_pt,country');
     const { data: releases, error } = await supabase
       .from('indicator_releases')
       .select('*')
@@ -329,7 +336,16 @@ async function loadTimeline() {
 
     // Séries contínuas (ex: Selic, taxas do BCE) ficam disponíveis todo dia mesmo sem
     // uma divulgação nova de verdade — só mostra quando o valor realmente mudou.
-    const changedReleases = releases.filter(rel => rel.previous_value === null || rel.actual_value !== rel.previous_value);
+    // Também tira o dólar/Ibovespa/tickers e séries sem evento de divulgação real
+    // (esses já aparecem no card de abertura/fechamento, não são "indicador econômico").
+    const NON_INDICATOR_CODES = ['BCB_USDBRL', 'IBOV', 'DTWEXBGS', 'DGS10', 'DCOILWTICO', 'DFF', 'ECBMRRFR', 'ECBDFR'];
+    const indMapPre = {};
+    (indicators || []).forEach(i => indMapPre[i.id] = i);
+    const changedReleases = releases.filter(rel => {
+      const code = indMapPre[rel.indicator_id]?.code;
+      if (code && NON_INDICATOR_CODES.includes(code)) return false;
+      return rel.previous_value === null || rel.actual_value !== rel.previous_value;
+    });
 
     if (changedReleases.length === 0) {
       list.innerHTML = '<p class="empty-note">Nenhuma divulgação registrada ainda.</p>';
@@ -357,7 +373,7 @@ async function loadTimeline() {
           <span class="tl-dot ${trend}"></span>
           <div class="tl-body">
             <div class="tl-name">${ind.name_pt || 'Indicador'}</div>
-            <div class="tl-vals">Real: ${fmtNum(rel.actual_value)} <span style="opacity:.6">· Anterior: ${fmtNum(rel.previous_value)}</span></div>
+            <div class="tl-vals">Atual: ${fmtNum(rel.actual_value)} <span style="opacity:.6">· Anterior: ${fmtNum(rel.previous_value)}</span></div>
           </div>
         </div>`;
     });
@@ -760,7 +776,7 @@ function renderTodayProbCard(aggProbUsd, aggProbIbov, nUsd, nIbov) {
       ${block('Mini Dólar (WDO)', aggProbUsd, nUsd)}
       ${block('Mini Índice (WIN)', aggProbIbov, nIbov)}
     </div>
-    <p class="prob-warning">⚠️ Isso não é recomendação de operação — é estatística histórica.</p>`;
+    <p class="prob-warning">⚠️ Isso não é recomendação de operação, é estatística histórica.</p>`;
 }
 
 function scenarioLine(scenarioLabel, pctUsd, pctIbov, ciUsd, ciIbov) {
@@ -833,7 +849,10 @@ async function loadDailySummary(dateStr) {
       const flag = countryFlag(ind.country);
       const time = ind.typical_time_brt ? ` · por volta das ${ind.typical_time_brt}` : '';
       const rel = releaseByIndicator[ind.id];
-      const releasedToday = !!(isToday && rel && rel.fetched_at && new Date(rel.fetched_at).toDateString() === new Date().toDateString());
+      const fetchedDateBR = rel && rel.fetched_at
+        ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(rel.fetched_at))
+        : null;
+      const releasedToday = !!(fetchedDateBR && fetchedDateBR === dateStr);
       const trend = rel ? trendClass(rel.actual_value, rel.previous_value) : 'flat';
 
       if (s && trend !== 'flat') {
@@ -913,15 +932,15 @@ async function loadDailySummary(dateStr) {
         const predictedUp = aggProb >= 50;
         const actualUp = actualTrend === 'up';
         const hit = predictedUp === actualUp;
-        const openCloseHtml = usdPrice && usdPrice.open != null
-          ? `<span class="retro-note">Abertura R$ ${fmtNum(usdPrice.open)} · Fechamento R$ ${fmtNum(usdPrice.close)}${usdPrice.high != null ? ` · Máx R$ ${fmtNum(usdPrice.high)} · Mín R$ ${fmtNum(usdPrice.low)}` : ''}</span>`
-          : '';
-        retroHtml += `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">
-          ${hit ? '✅' : '❌'} Nesse dia, o dólar à vista de fato <b>${actualUp ? 'subiu' : 'caiu'}</b>
-          (fechamento R$ ${fmtNum(usdRelease.actual_value)} vs. R$ ${fmtNum(usdRelease.previous_value)} do dia anterior) —
-          ${hit ? 'bateu' : 'não bateu'} com a probabilidade histórica agregada.
-          ${openCloseHtml}
-        </div>`;
+        const priceGrid = usdPrice && usdPrice.open != null
+          ? `<div class="price-grid">
+              <div class="price-item"><span class="price-label">Abertura</span><span class="price-value">R$ ${fmtNum(usdPrice.open)}</span></div>
+              <div class="price-item"><span class="price-label">Fechamento</span><span class="price-value">R$ ${fmtNum(usdPrice.close)}</span></div>
+              <div class="price-item"><span class="price-label">Máxima</span><span class="price-value">R$ ${fmtNum(usdPrice.high)}</span></div>
+              <div class="price-item"><span class="price-label">Mínima</span><span class="price-value">R$ ${fmtNum(usdPrice.low)}</span></div>
+            </div>`
+          : `<p class="stats-empty">Sem OHLC coletado pra esse dia.</p>`;
+        retroHtml += `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">${priceGrid}</div>`;
       } else if (actualTrend === 'flat') {
         retroHtml += `<div class="retro-banner retro-pending">O dólar à vista fechou estável nesse dia.</div>`;
       }
