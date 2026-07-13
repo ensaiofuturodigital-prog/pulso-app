@@ -1,0 +1,20 @@
+name: Fetch IBGE Data
+
+on:
+  schedule:
+    - cron: '30 10 * * *'  # todo dia às 10h30 UTC (7h30 Brasília)
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: node scripts/fetch-ibge.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
