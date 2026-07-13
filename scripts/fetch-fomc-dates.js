@@ -25,9 +25,24 @@ const ECB_DECISION_DATES = [
   '2026-09-10', '2026-10-29', '2026-12-17',
 ];
 
+// Datas reais de decisão do Copom 2026 (2º dia da reunião, comunicado ~18h30).
+// Fonte: calendário oficial divulgado pelo Banco Central (confirmado via CNN
+// Brasil, InfoMoney e XP, jun/2025). 2025 não incluído ainda — completar depois.
+const COPOM_DECISION_DATES = [
+  '2026-01-28', '2026-03-18', '2026-04-29', '2026-06-17',
+  '2026-08-05', '2026-09-16', '2026-11-04', '2026-12-09',
+];
+// Ata do Copom: divulgada na terça-feira da semana seguinte à decisão.
+const COPOM_ATA_DATES = [
+  '2026-02-03', '2026-03-24', '2026-05-05', '2026-06-23',
+  '2026-08-11', '2026-09-22', '2026-11-10', '2026-12-15',
+];
+
 const GROUPS = [
   { codes: ['DFF', 'DGS10'], dates: FOMC_DECISION_DATES, label: 'FOMC' },
   { codes: ['ECBMRRFR', 'ECBDFR'], dates: ECB_DECISION_DATES, label: 'BCE' },
+  { codes: ['BCB_SELIC'], dates: COPOM_DECISION_DATES, label: 'Copom (decisão)' },
+  { codes: ['BCB_COPOM_ATA'], dates: COPOM_ATA_DATES, label: 'Copom (ata)' },
 ];
 
 async function run() {
