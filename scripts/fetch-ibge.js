@@ -50,18 +50,35 @@ function chunk(arr, size) {
 }
 
 async function fetchIndiceSeries(table) {
-  const url = `https://apisidra.ibge.gov.br/values/t/${table}/n1/all/v/all/p/all`;
+  // "n1/1" (Brasil) é mais confiável que "n1/all" nem toda tabela do SIDRA
+  // tem a unidade territorial configurada para aceitar "all".
+  const url = `https://apisidra.ibge.gov.br/values/t/${table}/n1/1/v/all/p/all`;
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!res.ok) throw new Error(`SIDRA respondeu HTTP ${res.status}`);
   const data = await res.json();
   if (!Array.isArray(data) || data.length < 2) throw new Error('Resposta vazia/inesperada da SIDRA');
 
   const rows = data.slice(1); // primeira linha é o cabeçalho de nomes de coluna
-  // Filtra só a variável "Número-índice" (nome padrão do IBGE pra série de nível).
-  const indiceRows = rows.filter(r => (r.D2N || '').toLowerCase().includes('número-índice'));
-  if (indiceRows.length === 0) throw new Error('Variável "Número-índice" não encontrada na tabela');
 
-  return indiceRows
+  // Agrupa por variável (D2N) pra escolher a série "de cabeçalho" (número-índice).
+  const byVar = {};
+  for (const r of rows) {
+    const varName = r.D2N || '';
+    if (!byVar[varName]) byVar[varName] = [];
+    byVar[varName].push(r);
+  }
+  const varNames = Object.keys(byVar);
+  console.log(`   Variáveis encontradas na tabela ${table}: ${varNames.join(' | ')}`);
+
+  // Preferência: "número-índice" > qualquer "índice" > a variável com mais pontos.
+  let chosen = varNames.find(v => v.toLowerCase().includes('número-índice'))
+    || varNames.find(v => v.toLowerCase().includes('índice'))
+    || varNames.sort((a, b) => byVar[b].length - byVar[a].length)[0];
+
+  if (!chosen) throw new Error('Nenhuma variável utilizável encontrada');
+  console.log(`   Usando variável: "${chosen}"`);
+
+  return byVar[chosen]
     .map(r => {
       const periodCode = r.D3C; // formato YYYYMM
       const year = periodCode.slice(0, 4);
