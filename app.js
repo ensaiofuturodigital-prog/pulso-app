@@ -277,10 +277,16 @@ function renderNews() {
   list.innerHTML = newsCache.map(n => {
     const newsDate = new Date(n.published_at);
     const isToday = newsDate.toDateString() === new Date().toDateString();
-    const time = new Intl.DateTimeFormat('pt-BR', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
-      ...(isToday ? {} : { day: '2-digit', month: '2-digit' }),
-    }).format(newsDate);
+    const diffMins = Math.round((Date.now() - newsDate.getTime()) / 60000);
+    let time;
+    if (diffMins >= 0 && diffMins < 60) {
+      time = `há ${Math.max(1, diffMins)} min`;
+    } else {
+      time = new Intl.DateTimeFormat('pt-BR', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+        ...(isToday ? {} : { day: '2-digit', month: '2-digit' }),
+      }).format(newsDate);
+    }
     const breaking = isBreaking(n.title);
     return `
       <a class="news-row ${breaking ? 'is-breaking' : ''}" href="${n.url}" target="_blank" rel="noopener">
@@ -998,6 +1004,7 @@ function renderHolidayCalendar() {
 loadLastUpdate();
 loadTimeline();
 loadOvernightNews();
+setInterval(loadOvernightNews, 5 * 60 * 1000); // atualiza sozinho a cada 5 min
 loadJournal();
 wireDailyDateNav();
 loadDailySummary(todayStrBR());
