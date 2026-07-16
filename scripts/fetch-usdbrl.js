@@ -12,7 +12,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // candlestick que o trader vê no WDO. Não é o WDO em si (que é um futuro,
 // com um pequeno "custo de carrego" embutido pela taxa de juros), mas é a
 // referência gratuita mais próxima que existe.
-const YAHOO_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/BRL=X?range=25y&interval=1d';
+const YAHOO_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/BRL=X?range=1mo&interval=1d';
 const ASSET = 'USDBRL';
 const INDICATOR_CODE = 'BCB_USDBRL'; // mantém o mesmo código pra não quebrar o resto do site
 

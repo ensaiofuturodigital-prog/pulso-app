@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Ibovespa via Yahoo Finance (gratuito, sem chave). Usamos como proxy do WIN,
 // já que o preço real do mini-índice da B3 não é gratuito. (Trocamos da Stooq
 // pra cá porque a Stooq bloqueia pedidos automáticos com verificação de robô.)
-const YAHOO_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EBVSP?range=25y&interval=1d';
+const YAHOO_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EBVSP?range=1mo&interval=1d';
 
 function chunk(arr, size) {
   const out = [];
