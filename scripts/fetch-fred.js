@@ -120,6 +120,17 @@ async function run() {
 
       if (observations.length === 0) { console.log(`⚠️  ${ind.code}: nenhum dado retornado`); continue; }
 
+      // Payroll: FRED entrega o NÍVEL total de empregos (ex: 158.984 mil).
+      // O número que o mercado comenta é a VARIAÇÃO mês a mês (ex: +192K).
+      // Convertemos aqui pra bater com o que todo mundo usa como "o Payroll".
+      let obsForRows = observations;
+      if (ind.code === 'PAYEMS') {
+        obsForRows = observations.slice(1).map((o, i) => ({
+          date: o.date,
+          value: Math.round(o.value - observations[i].value),
+        }));
+      }
+
       // Antes de sobrescrever, verifica qual era a observação mais recente que já
       // tínhamos, pra saber se a mais nova de agora é realmente inédita (ou seja,
       // "acabou de sair"). É isso que alimenta o selo "✅ Saiu hoje" no site.
@@ -130,14 +141,14 @@ async function run() {
         .order('release_date', { ascending: false })
         .limit(1);
       const prevLatestDate = prevLatestRows && prevLatestRows[0] ? prevLatestRows[0].release_date : null;
-      const newestObsDate = observations[observations.length - 1].date;
+      const newestObsDate = obsForRows[obsForRows.length - 1].date;
       const isFreshRelease = newestObsDate !== prevLatestDate;
 
-      const rows = observations.map((obs, i) => ({
+      const rows = obsForRows.map((obs, i) => ({
         indicator_id: indicatorId,
         release_date: obs.date,
         actual_value: parseFloat(obs.value),
-        previous_value: i > 0 ? parseFloat(observations[i - 1].value) : null,
+        previous_value: i > 0 ? parseFloat(obsForRows[i - 1].value) : null,
       }));
 
       for (const batch of chunk(rows, 500)) {
