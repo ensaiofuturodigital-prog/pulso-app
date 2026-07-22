@@ -82,6 +82,23 @@ async function run() {
     if (error) console.error('Erro no lote de price_daily (USDBRL):', error.message);
   }
 
+  // 1b) price_daily também como 'WDO' (proxy gratuito do mini-dólar futuro) —
+  //     mesmo candle do câmbio à vista, só que sob o código que o gráfico do
+  //     WDO usa no site. Não é o WDO real (ver nota da fonte acima), mas é a
+  //     referência gratuita mais próxima que existe.
+  const wdoRows = observations.map(o => ({
+    asset: 'WDO',
+    price_date: o.date,
+    open: o.open ?? null,
+    high: o.high ?? null,
+    low: o.low ?? null,
+    close: o.close,
+  }));
+  for (const batch of chunk(wdoRows, 500)) {
+    const { error } = await supabase.from('price_daily').upsert(batch, { onConflict: 'asset,price_date' });
+    if (error) console.error('Erro no lote de price_daily (WDO):', error.message);
+  }
+
   // 2) indicator_releases: mantém o fechamento como actual_value, pro resto do
   //    site (cálculo de probabilidade, retro-check) continuar funcionando igual.
   const releaseRows = observations.map((obs, i) => ({
