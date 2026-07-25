@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pulso — Painel do Trader</title>
-<meta name="description" content="Indicadores econômicos, calendário e diário de operações para day trade de WDO e WIN.">
+<meta name="description" content="Indicadores econômicos, calendário e probabilidade de reação para day trade de WDO e WIN.">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#14181D">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -62,10 +62,6 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12 L18 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Radar de Notícias</span>
       </button>
-      <button class="tab-btn" data-tab="diario">
-        <svg viewBox="0 0 24 24"><path d="M6 3.5H15L19 7.5V20.5H6V3.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12H15M9 15.5H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <span>Diário do Trader</span>
-      </button>
     </nav>
 
     <!-- MAIN -->
@@ -109,6 +105,10 @@
           <p class="widget-credit">Widget oficial e gratuito da <a href="https://www.investing.com" target="_blank" rel="noopener">Investing.com</a>, filtrado só pra Brasil, EUA e Zona do Euro.</p>
         </div>
 
+        <h2 class="section-subhead">Calendário de feriados</h2>
+        <p class="calendar-legend-intro">Dias em que a B3 (Brasil) ou as bolsas dos EUA ficam fechadas.</p>
+        <div class="holiday-calendar holiday-calendar-featured" id="holidayCalendar"></div>
+
         <h2 class="section-subhead">Indicadores econômicos</h2>
         <div class="timeline" id="calendarList">
           <div class="skeleton-row"></div>
@@ -127,81 +127,6 @@
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
         </div>
-      </section>
-
-      <!-- DIARIO -->
-      <section class="panel" id="panel-diario">
-        <div class="panel-head">
-          <h1>Diário de operações</h1>
-          <p>Registre cada trade em segundos. Com o tempo, isso revela seus próprios padrões — não é sinal, é autoconhecimento com dado.</p>
-        </div>
-
-        <h2 class="section-subhead">Ativos</h2>
-        <form class="trade-form" id="tradeForm">
-          <div class="field field-wide">
-            <label for="tf-asset">Ativo</label>
-            <select id="tf-asset" required>
-              <option value="WDO">WDO — Mini Dólar</option>
-              <option value="WIN">WIN — Mini Índice</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="tf-entry-price">Preço de entrada</label>
-            <input type="number" id="tf-entry-price" step="any" placeholder="Ex: 5417,50">
-          </div>
-          <div class="field">
-            <label for="tf-entry-time">Data e horário de entrada</label>
-            <input type="datetime-local" id="tf-entry-time" required>
-          </div>
-          <div class="field">
-            <label for="tf-exit-price">Preço de saída</label>
-            <input type="number" id="tf-exit-price" step="any" placeholder="Ex: 5429,50">
-          </div>
-          <div class="field">
-            <label for="tf-exit-time">Data e horário de saída</label>
-            <input type="datetime-local" id="tf-exit-time">
-          </div>
-          <div class="field field-wide">
-            <label for="tf-result">Resultado (pontos)</label>
-            <input type="number" id="tf-result" step="any" placeholder="Ex: -12 ou 34">
-          </div>
-          <button type="submit" class="btn-primary">Registrar operação</button>
-          <span class="form-status" id="formStatus"></span>
-        </form>
-
-        <div class="journal-summary" id="journalSummary"></div>
-        <div class="journal-actions">
-          <button type="button" class="btn-secondary" id="exportCsvBtn">Exportar CSV</button>
-        </div>
-        <div class="journal-list" id="journalList">
-          <div class="skeleton-row"></div>
-        </div>
-
-        <h2 class="section-subhead">Resultado da semana</h2>
-        <div class="weekly-summary" id="weeklySummary"></div>
-
-        <h2 class="section-subhead">Seus padrões (horário e dia da semana)</h2>
-        <div class="patterns-grid">
-          <div class="pattern-col">
-            <h3 class="pattern-title">Por horário</h3>
-            <div id="patternsByHour"></div>
-          </div>
-          <div class="pattern-col">
-            <h3 class="pattern-title">Por dia da semana</h3>
-            <div id="patternsByWeekday"></div>
-          </div>
-        </div>
-
-        <h2 class="section-subhead">Bloco de notas</h2>
-        <div class="notepad-wrap">
-          <textarea id="notepadArea" maxlength="1000" placeholder="Anote aqui o que precisa revisar, corrigir, lembrar... (até 1000 caracteres)"></textarea>
-          <span class="notepad-status" id="notepadStatus"></span>
-          <span class="notepad-counter" id="notepadCounter">0/1000</span>
-        </div>
-
-        <h2 class="section-subhead">Calendário de feriados</h2>
-        <p class="calendar-legend-intro">Dias em que a B3 (Brasil) ou as bolsas dos EUA ficam fechadas.</p>
-        <div class="holiday-calendar" id="holidayCalendar"></div>
       </section>
 
     </main>
