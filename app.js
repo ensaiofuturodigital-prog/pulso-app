@@ -386,232 +386,6 @@ async function loadLastUpdate() {
   }
 }
 
-/* ---------------- TRADE JOURNAL ---------------- */
-const form = document.getElementById('tradeForm');
-const statusEl = document.getElementById('formStatus');
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  statusEl.textContent = 'Salvando…';
-
-  const exitTimeVal = document.getElementById('tf-exit-time').value;
-  const payload = {
-    asset: document.getElementById('tf-asset').value,
-    trade_time: new Date(document.getElementById('tf-entry-time').value).toISOString(),
-    price: document.getElementById('tf-entry-price').value ? parseFloat(document.getElementById('tf-entry-price').value) : null,
-    exit_price: document.getElementById('tf-exit-price').value ? parseFloat(document.getElementById('tf-exit-price').value) : null,
-    exit_time: exitTimeVal ? new Date(exitTimeVal).toISOString() : null,
-    result: document.getElementById('tf-result').value ? parseFloat(document.getElementById('tf-result').value) : null,
-  };
-
-  const { error } = await supabase.from('trade_journal').insert(payload);
-  if (error) {
-    console.error(error);
-    statusEl.textContent = 'Erro ao salvar. Tenta de novo?';
-    return;
-  }
-  statusEl.textContent = 'Operação registrada ✓';
-  form.reset();
-  loadJournal();
-  setTimeout(() => statusEl.textContent = '', 2500);
-});
-
-// Default the datetime field to "now" in local time
-(function setDefaultTime() {
-  const el = document.getElementById('tf-entry-time');
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  el.value = now.toISOString().slice(0, 16);
-})();
-
-let lastJournalData = [];
-
-async function loadJournal() {
-  const listEl = document.getElementById('journalList');
-  const summaryEl = document.getElementById('journalSummary');
-  try {
-    const { data, error } = await supabase
-      .from('trade_journal')
-      .select('*')
-      .order('trade_time', { ascending: false })
-      .limit(50);
-    if (error) throw error;
-    lastJournalData = data || [];
-
-    if (!data || data.length === 0) {
-      summaryEl.innerHTML = '';
-      listEl.innerHTML = '<p class="empty-note">Nenhuma operação registrada ainda — comece pelo formulário acima.</p>';
-      return;
-    }
-
-    const total = data.reduce((s, t) => s + (t.result || 0), 0);
-    const wins = data.filter(t => (t.result || 0) > 0).length;
-    const winRate = Math.round((wins / data.length) * 100);
-
-    summaryEl.innerHTML = `
-      <div class="js-stat"><div class="js-stat-label">Operações</div><div class="js-stat-value">${data.length}</div></div>
-      <div class="js-stat"><div class="js-stat-label">Resultado total</div><div class="js-stat-value ${total >= 0 ? 'pos' : 'neg'}">${total >= 0 ? '+' : ''}${fmtNum(total)}</div></div>
-      <div class="js-stat"><div class="js-stat-label">Taxa de acerto</div><div class="js-stat-value">${winRate}%</div></div>`;
-
-    listEl.innerHTML = data.map(t => {
-      const r = t.result;
-      const rClass = r > 0 ? 'pos' : r < 0 ? 'neg' : '';
-      const entryTime = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(t.trade_time));
-      const exitTime = t.exit_time ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(t.exit_time)) : null;
-      const entryTxt = `Entrada: ${entryTime}${t.price !== null && t.price !== undefined ? ` @ ${fmtNum(t.price)}` : ''}`;
-      const exitTxt = exitTime ? ` · Saída: ${exitTime}${t.exit_price !== null && t.exit_price !== undefined ? ` @ ${fmtNum(t.exit_price)}` : ''}` : '';
-      return `
-        <div class="j-row">
-          <span class="j-asset">${t.asset}</span>
-          <div class="j-info">
-            <div class="j-reason">${entryTxt}${exitTxt}</div>
-          </div>
-          <span class="j-result ${rClass}">${r === null ? '—' : (r >= 0 ? '+' : '') + fmtNum(r)}</span>
-        </div>`;
-    }).join('');
-
-    renderWeeklySummary(data);
-    renderPatterns(data);
-  } catch (err) {
-    console.error(err);
-    listEl.innerHTML = '<p class="empty-note">Não consegui carregar o diário agora.</p>';
-  }
-}
-
-/* ---------------- EXPORTAR CSV ---------------- */
-document.getElementById('exportCsvBtn').addEventListener('click', () => {
-  if (!lastJournalData || lastJournalData.length === 0) {
-    alert('Nenhuma operação registrada ainda pra exportar.');
-    return;
-  }
-  const headers = ['ativo', 'data_hora_entrada', 'preco_entrada', 'data_hora_saida', 'preco_saida', 'resultado'];
-  const rows = lastJournalData.map(t => [
-    t.asset,
-    t.trade_time ? new Date(t.trade_time).toISOString() : '',
-    t.price ?? '',
-    t.exit_time ? new Date(t.exit_time).toISOString() : '',
-    t.exit_price ?? '',
-    t.result ?? '',
-  ]);
-  const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `pulso-diario-${todayStrBR()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-});
-
-/* ---------------- RESUMO SEMANAL ---------------- */
-function isoWeekKey(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return `${d.getUTCFullYear()}-S${String(weekNo).padStart(2, '0')}`;
-}
-
-function renderWeeklySummary(allTrades) {
-  const el = document.getElementById('weeklySummary');
-  if (!allTrades || allTrades.length === 0) {
-    el.innerHTML = '<p class="empty-note">Sem operações suficientes ainda pra montar o resumo semanal.</p>';
-    return;
-  }
-  const weeks = {};
-  allTrades.forEach(t => {
-    const key = isoWeekKey(new Date(t.trade_time));
-    if (!weeks[key]) weeks[key] = { total: 0, count: 0, wins: 0 };
-    weeks[key].total += (t.result || 0);
-    weeks[key].count += 1;
-    if ((t.result || 0) > 0) weeks[key].wins += 1;
-  });
-  const sortedKeys = Object.keys(weeks).sort().reverse().slice(0, 6);
-
-  el.innerHTML = sortedKeys.map(key => {
-    const w = weeks[key];
-    const winRate = Math.round((w.wins / w.count) * 100);
-    const cls = w.total >= 0 ? 'pos' : 'neg';
-    return `
-      <div class="week-row">
-        <span class="week-label">${key}</span>
-        <span class="week-count">${w.count} op.</span>
-        <span class="week-winrate">${winRate}% acerto</span>
-        <span class="week-total ${cls}">${w.total >= 0 ? '+' : ''}${fmtNum(w.total)}</span>
-      </div>`;
-  }).join('');
-}
-
-/* ---------------- PADRÕES: HORÁRIO E DIA DA SEMANA ---------------- */
-function renderPatterns(allTrades) {
-  const hourEl = document.getElementById('patternsByHour');
-  const wdEl = document.getElementById('patternsByWeekday');
-  if (!allTrades || allTrades.length < 5) {
-    const msg = '<p class="empty-note">Registre pelo menos 5 operações pra ver seus padrões por horário e dia da semana.</p>';
-    hourEl.innerHTML = msg;
-    wdEl.innerHTML = '';
-    return;
-  }
-
-  // Janelas de horário alinhadas com a sessão de operação (8h-19h)
-  const HOUR_BUCKETS = [
-    { label: '08h-10h', min: 8, max: 10 },
-    { label: '10h-12h', min: 10, max: 12 },
-    { label: '12h-14h', min: 12, max: 14 },
-    { label: '14h-16h', min: 14, max: 16 },
-    { label: '16h-19h', min: 16, max: 19 },
-  ];
-  const hourStats = HOUR_BUCKETS.map(b => ({ ...b, total: 0, count: 0, wins: 0 }));
-
-  const WEEKDAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  const wdStats = WEEKDAY_NAMES.map(name => ({ name, total: 0, count: 0, wins: 0 }));
-
-  allTrades.forEach(t => {
-    const d = new Date(t.trade_time);
-    const hourFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false });
-    const hour = parseInt(hourFmt.format(d), 10);
-    const bucket = hourStats.find(b => hour >= b.min && hour < b.max);
-    if (bucket) {
-      bucket.total += (t.result || 0);
-      bucket.count += 1;
-      if ((t.result || 0) > 0) bucket.wins += 1;
-    }
-
-    const wdFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
-    const wdName = wdFmt.format(d);
-    const idxMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-    const wd = wdStats[idxMap[wdName]];
-    if (wd) {
-      wd.total += (t.result || 0);
-      wd.count += 1;
-      if ((t.result || 0) > 0) wd.wins += 1;
-    }
-  });
-
-  function renderRows(rows) {
-    const active = rows.filter(r => r.count > 0);
-    if (active.length === 0) return '<p class="empty-note">Sem dado suficiente ainda.</p>';
-    return active.map(r => {
-      const winRate = Math.round((r.wins / r.count) * 100);
-      const cls = r.total >= 0 ? 'pos' : 'neg';
-      return `
-        <div class="week-row">
-          <span class="week-label">${r.label || r.name}</span>
-          <span class="week-count">${r.count} op.</span>
-          <span class="week-winrate">${winRate}% acerto</span>
-          <span class="week-total ${cls}">${r.total >= 0 ? '+' : ''}${fmtNum(r.total)}</span>
-        </div>`;
-    }).join('');
-  }
-
-  hourEl.innerHTML = renderRows(hourStats);
-  wdEl.innerHTML = renderRows(wdStats.filter(w => w.name !== 'Domingo' && w.name !== 'Sábado'));
-}
-
-
 function renderTodayProbCard(aggProbUsd, aggProbIbov, nUsd, nIbov) {
   const el = document.getElementById('todayProbCard');
   if (!el) return;
@@ -676,112 +450,15 @@ async function loadDailySummary(dateStr) {
   const head = document.getElementById('dailySummaryHead');
   const retroEl = document.getElementById('dailySummaryRetro');
   const itemsEl = document.getElementById('dailySummaryItems');
-  const isToday = dateStr === todayStrBR();
   const dateLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(dateStr + 'T12:00:00'));
 
   retroEl.innerHTML = '';
   itemsEl.innerHTML = '<p class="stats-empty">Carregando…</p>';
+  head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
 
   try {
-    const { data: scheduled, error } = await supabase
-      .from('release_schedule')
-      .select('indicator_id')
-      .eq('release_date', dateStr);
-    if (error) throw error;
-
-    if (!scheduled || scheduled.length === 0) {
-      head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-      itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
-      return;
-    }
-
-    const ids = scheduled.map(s => s.indicator_id);
-    const { data: indicatorsRaw } = await supabase.from('indicators').select('*').in('id', ids);
-    const indicators = (indicatorsRaw || []).filter(i => !NON_DISPLAY_CODES.includes(i.code));
-    if (indicators.length === 0) {
-      head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-      itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
-      return;
-    }
-    const { data: statsRows } = await supabase.from('indicator_stats').select('*').in('indicator_id', indicators.map(i => i.id));
-    const statsMap = {};
-    (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
-
-    // Pra cada indicador, pega a divulgação mais próxima na data ou antes dela (o dado mensal não
-    // costuma bater com o dia exato do anúncio — ver aviso na aba Calendário)
-    const releaseByIndicator = {};
-    await Promise.all(ids.map(async (id) => {
-      const { data } = await supabase
-        .from('indicator_releases')
-        .select('*')
-        .eq('indicator_id', id)
-        .lte('release_date', dateStr)
-        .order('release_date', { ascending: false })
-        .limit(1);
-      if (data && data.length) releaseByIndicator[id] = data[0];
-    }));
-
-    const sorted = (indicators || []).sort((a, b) => (b.importance || 1) - (a.importance || 1));
-
-    head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-
-    let weightedSum = 0, weightTotal = 0;
-    let weightedSumIbov = 0, weightTotalIbov = 0;
-    itemsEl.innerHTML = sorted.map(ind => {
-      const s = statsMap[ind.id];
-      const flag = countryFlag(ind.country);
-      const time = ind.typical_time_brt ? ` · por volta das ${ind.typical_time_brt}` : '';
-      const rel = releaseByIndicator[ind.id];
-      const fetchedDateBR = rel && rel.fetched_at
-        ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(rel.fetched_at))
-        : null;
-      const releasedToday = !!(fetchedDateBR && fetchedDateBR === dateStr);
-      const trend = rel ? trendClass(rel.actual_value, rel.previous_value) : 'flat';
-
-      if (s && trend !== 'flat') {
-        const prob = trend === 'up' ? s.pct_usd_up_after_indicator_up : s.pct_usd_up_after_indicator_down;
-        if (prob !== null && prob !== undefined && (s.sample_size || 0) >= 5) {
-          weightedSum += prob * s.sample_size;
-          weightTotal += s.sample_size;
-        }
-        const probIbov = trend === 'up' ? s.pct_ibov_up_after_indicator_up : s.pct_ibov_up_after_indicator_down;
-        if (probIbov !== null && probIbov !== undefined && (s.sample_size || 0) >= 5) {
-          weightedSumIbov += probIbov * s.sample_size;
-          weightTotalIbov += s.sample_size;
-        }
-      }
-
-      let scenarios;
-      if (releasedToday && s && trend !== 'flat') {
-        // Já saiu hoje: mostra só o cenário que de fato aconteceu, resolvido.
-        const ciUsd = trend === 'up' ? s.confidence?.usd_up : s.confidence?.usd_down;
-        const ciIbov = trend === 'up' ? s.confidence?.ibov_up : s.confidence?.ibov_down;
-        const pctUsd = trend === 'up' ? s.pct_usd_up_after_indicator_up : s.pct_usd_up_after_indicator_down;
-        const pctIbov = trend === 'up' ? s.pct_ibov_up_after_indicator_up : s.pct_ibov_up_after_indicator_down;
-        scenarios =
-          `<span class="conf-badge released-badge">✅ Saiu: veio ${trend === 'up' ? 'ACIMA' : 'ABAIXO'} do anterior (${fmtNum(rel.actual_value)} vs. ${fmtNum(rel.previous_value)})</span>` +
-          scenarioLine(`Nova leitura pra hoje`, pctUsd, pctIbov, ciUsd, ciIbov);
-      } else if (releasedToday && (!s || trend === 'flat')) {
-        scenarios = `<span class="conf-badge released-badge">✅ Saiu hoje (${fmtNum(rel.actual_value)}), sem variação relevante ou sem amostra histórica.</span>`;
-      } else {
-        scenarios = s
-          ? `<span class="conf-badge ${confidenceLabel(s.sample_size, s.confidence?.usd_up?.level).cls}">⏳ Ainda não saiu · ${confidenceLabel(s.sample_size, s.confidence?.usd_up?.level).text} · ${s.sample_size} divulgações</span>` +
-            scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up) +
-            scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)
-          : '<p class="stats-empty">⏳ Ainda não saiu · sem amostra histórica suficiente ainda.</p>';
-      }
-      return `
-        <div class="summary-item">
-          <div class="summary-item-head">${flag} <b>${ind.name_pt}</b> ${importanceBadge(ind.importance)}${time}</div>
-          ${scenarios}
-        </div>`;
-    }).filter((_, idx) => (sorted[idx].importance || 1) >= 2).join('') || '<p class="stats-empty">Só indicadores de baixa relevância hoje — nada de média/alta pra mostrar.</p>';
-
-    /* Probabilidade agregada + conferência retroativa */
-    const aggProb = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null;
-    const aggProbIbov = weightTotalIbov > 0 ? Math.round(weightedSumIbov / weightTotalIbov) : null;
-    renderTodayProbCard(aggProb, aggProbIbov, weightTotal, weightTotalIbov);
-
+    // Dólar à vista pra essa data: busca e mostra sempre, não depende de ter
+    // indicador econômico agendado no mesmo dia (antes ficava preso a isso).
     let usdIndId = null;
     try {
       const { data: usdInd } = await supabase.from('indicators').select('id').eq('code', 'BCB_USDBRL').maybeSingle();
@@ -808,28 +485,127 @@ async function loadDailySummary(dateStr) {
       usdPrice = priceRows && priceRows[0] ? priceRows[0] : null;
     }
 
-    let retroHtml = '';
-    if (usdRelease) {
-      const actualTrend = trendClass(usdRelease.actual_value, usdRelease.previous_value);
-      if (actualTrend !== 'flat' && aggProb !== null) {
-        const predictedUp = aggProb >= 50;
-        const actualUp = actualTrend === 'up';
-        const hit = predictedUp === actualUp;
-        const priceGrid = usdPrice && usdPrice.open != null
-          ? `<div class="price-grid">
-              <div class="price-item"><span class="price-label">Abertura</span><span class="price-value">R$ ${fmtNum(usdPrice.open)}</span></div>
-              <div class="price-item"><span class="price-label">Fechamento</span><span class="price-value">R$ ${fmtNum(usdPrice.close)}</span></div>
-              <div class="price-item"><span class="price-label">Máxima</span><span class="price-value">R$ ${fmtNum(usdPrice.high)}</span></div>
-              <div class="price-item"><span class="price-label">Mínima</span><span class="price-value">R$ ${fmtNum(usdPrice.low)}</span></div>
-            </div>`
-          : `<p class="stats-empty">Sem OHLC coletado pra esse dia.</p>`;
-        retroHtml += `<div class="retro-banner ${hit ? 'retro-match' : 'retro-miss'}">${priceGrid}</div>`;
-      } else if (actualTrend === 'flat') {
-        retroHtml += `<div class="retro-banner retro-pending">O dólar à vista fechou estável nesse dia.</div>`;
+    const { data: scheduled, error } = await supabase
+      .from('release_schedule')
+      .select('indicator_id')
+      .eq('release_date', dateStr);
+    if (error) throw error;
+
+    let aggProb = null, aggProbIbov = null, weightTotal = 0, weightTotalIbov = 0;
+
+    if (!scheduled || scheduled.length === 0) {
+      itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
+    } else {
+      const ids = scheduled.map(s => s.indicator_id);
+      const { data: indicatorsRaw } = await supabase.from('indicators').select('*').in('id', ids);
+      const indicators = (indicatorsRaw || []).filter(i => !NON_DISPLAY_CODES.includes(i.code));
+
+      if (indicators.length === 0) {
+        itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
+      } else {
+        const { data: statsRows } = await supabase.from('indicator_stats').select('*').in('indicator_id', indicators.map(i => i.id));
+        const statsMap = {};
+        (statsRows || []).forEach(s => statsMap[s.indicator_id] = s);
+
+        // Pra cada indicador, pega a divulgação mais próxima na data ou antes dela (o dado mensal não
+        // costuma bater com o dia exato do anúncio — ver aviso na aba Calendário)
+        const releaseByIndicator = {};
+        await Promise.all(ids.map(async (id) => {
+          const { data } = await supabase
+            .from('indicator_releases')
+            .select('*')
+            .eq('indicator_id', id)
+            .lte('release_date', dateStr)
+            .order('release_date', { ascending: false })
+            .limit(1);
+          if (data && data.length) releaseByIndicator[id] = data[0];
+        }));
+
+        const sorted = (indicators || []).sort((a, b) => (b.importance || 1) - (a.importance || 1));
+
+        let weightedSum = 0, weightedSumIbov = 0;
+        itemsEl.innerHTML = sorted.map(ind => {
+          const s = statsMap[ind.id];
+          const flag = countryFlag(ind.country);
+          const time = ind.typical_time_brt ? ` · por volta das ${ind.typical_time_brt}` : '';
+          const rel = releaseByIndicator[ind.id];
+          const fetchedDateBR = rel && rel.fetched_at
+            ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(rel.fetched_at))
+            : null;
+          const releasedToday = !!(fetchedDateBR && fetchedDateBR === dateStr);
+          const trend = rel ? trendClass(rel.actual_value, rel.previous_value) : 'flat';
+
+          if (s && trend !== 'flat') {
+            const prob = trend === 'up' ? s.pct_usd_up_after_indicator_up : s.pct_usd_up_after_indicator_down;
+            if (prob !== null && prob !== undefined && (s.sample_size || 0) >= 5) {
+              weightedSum += prob * s.sample_size;
+              weightTotal += s.sample_size;
+            }
+            const probIbov = trend === 'up' ? s.pct_ibov_up_after_indicator_up : s.pct_ibov_up_after_indicator_down;
+            if (probIbov !== null && probIbov !== undefined && (s.sample_size || 0) >= 5) {
+              weightedSumIbov += probIbov * s.sample_size;
+              weightTotalIbov += s.sample_size;
+            }
+          }
+
+          let scenarios;
+          if (releasedToday && s && trend !== 'flat') {
+            // Já saiu hoje: mostra só o cenário que de fato aconteceu, resolvido.
+            const ciUsd = trend === 'up' ? s.confidence?.usd_up : s.confidence?.usd_down;
+            const ciIbov = trend === 'up' ? s.confidence?.ibov_up : s.confidence?.ibov_down;
+            const pctUsd = trend === 'up' ? s.pct_usd_up_after_indicator_up : s.pct_usd_up_after_indicator_down;
+            const pctIbov = trend === 'up' ? s.pct_ibov_up_after_indicator_up : s.pct_ibov_up_after_indicator_down;
+            scenarios =
+              `<span class="conf-badge released-badge">✅ Saiu: veio ${trend === 'up' ? 'ACIMA' : 'ABAIXO'} do anterior (${fmtNum(rel.actual_value)} vs. ${fmtNum(rel.previous_value)})</span>` +
+              scenarioLine(`Nova leitura pra hoje`, pctUsd, pctIbov, ciUsd, ciIbov);
+          } else if (releasedToday && (!s || trend === 'flat')) {
+            scenarios = `<span class="conf-badge released-badge">✅ Saiu hoje (${fmtNum(rel.actual_value)}), sem variação relevante ou sem amostra histórica.</span>`;
+          } else {
+            scenarios = s
+              ? `<span class="conf-badge ${confidenceLabel(s.sample_size, s.confidence?.usd_up?.level).cls}">⏳ Ainda não saiu · ${confidenceLabel(s.sample_size, s.confidence?.usd_up?.level).text} · ${s.sample_size} divulgações</span>` +
+                scenarioLine('Se vier ACIMA do anterior', s.pct_usd_up_after_indicator_up, s.pct_ibov_up_after_indicator_up, s.confidence?.usd_up, s.confidence?.ibov_up) +
+                scenarioLine('Se vier ABAIXO do anterior', s.pct_usd_up_after_indicator_down, s.pct_ibov_up_after_indicator_down, s.confidence?.usd_down, s.confidence?.ibov_down)
+              : '<p class="stats-empty">⏳ Ainda não saiu · sem amostra histórica suficiente ainda.</p>';
+          }
+          return `
+            <div class="summary-item">
+              <div class="summary-item-head">${flag} <b>${ind.name_pt}</b> ${importanceBadge(ind.importance)}${time}</div>
+              ${scenarios}
+            </div>`;
+        }).filter((_, idx) => (sorted[idx].importance || 1) >= 2).join('') || '<p class="stats-empty">Só indicadores de baixa relevância hoje — nada de média/alta pra mostrar.</p>';
+
+        aggProb = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null;
+        aggProbIbov = weightTotalIbov > 0 ? Math.round(weightedSumIbov / weightTotalIbov) : null;
       }
+    }
+
+    renderTodayProbCard(aggProb, aggProbIbov, weightTotal, weightTotalIbov);
+
+    // Card do dólar à vista: mostra sempre que houver candle pra essa data,
+    // com selo de acerto/erro só quando dá pra comparar com uma probabilidade do dia.
+    let retroHtml = '';
+    if (usdPrice && usdPrice.open != null) {
+      const priceGrid = `<p class="price-grid-label">Dólar à vista (USD/BRL) — referência de mercado, não é a cotação do contrato futuro WDO</p>
+        <div class="price-grid">
+          <div class="price-item"><span class="price-label">Abertura</span><span class="price-value">R$ ${fmtNum(usdPrice.open)}</span></div>
+          <div class="price-item"><span class="price-label">Fechamento</span><span class="price-value">R$ ${fmtNum(usdPrice.close)}</span></div>
+          <div class="price-item"><span class="price-label">Máxima</span><span class="price-value">R$ ${fmtNum(usdPrice.high)}</span></div>
+          <div class="price-item"><span class="price-label">Mínima</span><span class="price-value">R$ ${fmtNum(usdPrice.low)}</span></div>
+        </div>`;
+
+      let bannerClass = 'retro-pending';
+      if (usdRelease && aggProb !== null) {
+        const actualTrend = trendClass(usdRelease.actual_value, usdRelease.previous_value);
+        if (actualTrend !== 'flat') {
+          const predictedUp = aggProb >= 50;
+          const actualUp = actualTrend === 'up';
+          bannerClass = predictedUp === actualUp ? 'retro-match' : 'retro-miss';
+        }
+      }
+      retroHtml = `<div class="retro-banner ${bannerClass}">${priceGrid}</div>`;
     } else {
       const isFuture = dateStr > todayStrBR();
-      retroHtml += `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem dado de fechamento do dólar coletado pra essa data ainda (fim de semana, feriado, ou o robô ainda não rodou).'}</div>`;
+      retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem candle do dólar à vista coletado pra essa data (fim de semana, feriado, ou o robô ainda não rodou).'}</div>`;
     }
     retroEl.innerHTML = retroHtml;
   } catch (err) {
@@ -855,33 +631,6 @@ function wireDailyDateNav() {
   document.getElementById('dayToday').addEventListener('click', () => {
     dayInput.value = todayStrBR();
     loadDailySummary(dayInput.value);
-  });
-}
-
-/* ---------------- BLOCO DE NOTAS ---------------- */
-let notepadTimer = null;
-async function loadNotepad() {
-  const area = document.getElementById('notepadArea');
-  const status = document.getElementById('notepadStatus');
-  const counter = document.getElementById('notepadCounter');
-  try {
-    const { data, error } = await supabase.from('notepad').select('content').eq('id', 1).single();
-    if (error) throw error;
-    area.value = data?.content || '';
-    counter.textContent = `${area.value.length}/1000`;
-  } catch (err) {
-    console.error(err);
-  }
-  area.addEventListener('input', () => {
-    counter.textContent = `${area.value.length}/1000`;
-    status.textContent = 'digitando…';
-    clearTimeout(notepadTimer);
-    notepadTimer = setTimeout(async () => {
-      status.textContent = 'salvando…';
-      const { error } = await supabase.from('notepad').update({ content: area.value, updated_at: new Date().toISOString() }).eq('id', 1);
-      status.textContent = error ? 'erro ao salvar' : 'salvo ✓';
-      setTimeout(() => { if (status.textContent === 'salvo ✓') status.textContent = ''; }, 2000);
-    }, 900);
   });
 }
 
@@ -1005,10 +754,8 @@ loadLastUpdate();
 loadTimeline();
 loadOvernightNews();
 setInterval(loadOvernightNews, 5 * 60 * 1000); // atualiza sozinho a cada 5 min
-loadJournal();
 wireDailyDateNav();
 loadDailySummary(todayStrBR());
-loadNotepad();
 renderHolidayCalendar();
 document.getElementById('enablePushBtn').addEventListener('click', enablePush);
 checkPushStatus();
