@@ -30,6 +30,14 @@ const INDICATORS = [
   { code: 'ECBDFR', name_pt: 'Taxa de Depósito do BCE (Zona do Euro)', description_pt: 'Taxa que o BCE paga aos bancos por depósitos overnight — termômetro extra da política monetária europeia.', frequency: 'event' },
   { code: 'LRHUTTTTEZM156S', name_pt: 'Taxa de Desemprego - Zona do Euro', description_pt: 'Desemprego na Zona do Euro. Enfraquecimento pode pressionar o BCE a cortar juros, o que tende a fortalecer o dólar frente ao euro.', frequency: 'monthly', source_override: 'eurostat' },
   { code: 'CP0000EZ19M086NEST', name_pt: 'Inflação HICP - Zona do Euro', description_pt: 'Inflação oficial da Zona do Euro. Acima do esperado pressiona o BCE a manter ou subir juros.', frequency: 'monthly' },
+
+  // Indicadores SEMANAIS adicionados em 26/07/2026 pra reduzir os dias sem
+  // nenhuma divulgação no "Painel do dia" (antes só a quinta-feira, do ICSA,
+  // costumava ter dado).
+  { code: 'MORTGAGE30US', name_pt: 'Juros de Hipotecas de 30 anos (EUA)', description_pt: 'Taxa média semanal de hipoteca de 30 anos (Freddie Mac). Sobe = crédito mais caro = pode esfriar consumo e imóveis.', frequency: 'weekly' },
+  { code: 'WCESTUS1', name_pt: 'Estoques de Petróleo Bruto (EUA)', description_pt: 'Estoque semanal de petróleo bruto nos EUA (EIA). Estoque subindo mais que o esperado costuma pressionar o preço do petróleo pra baixo.', frequency: 'weekly' },
+  { code: 'WALCL', name_pt: 'Balanço Patrimonial do Federal Reserve', description_pt: 'Total de ativos do Fed. Mostra se o Fed está injetando (QE) ou retirando (QT) dinheiro do sistema.', frequency: 'weekly' },
+  { code: 'WRESBAL', name_pt: 'Saldos de Reservas Bancárias no Fed', description_pt: 'Dinheiro que os bancos têm parado no Fed. Queda forte pode sinalizar aperto de liquidez no sistema financeiro americano.', frequency: 'weekly' },
 ];
 
 // Busca o máximo de histórico que o FRED permitir (cada série tem uma data de início diferente)
