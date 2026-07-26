@@ -1,4 +1,7 @@
-const CACHE_NAME = 'pulso-shell-v1';
+// Versão do cache: SUBIR esse número sempre que app.js/index.html/style.css mudarem
+// de um jeito que remova elementos do HTML ou funções do JS — isso força o
+// navegador de todo mundo a descartar a cópia antiga e buscar a nova.
+const CACHE_NAME = 'pulso-shell-v2';
 const SHELL_FILES = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -17,24 +20,24 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Só cacheia o "esqueleto" do app (HTML/CSS/JS). Chamadas ao Supabase e ao
-// widget do Investing.com continuam indo direto pra rede, sempre com dado atual.
+// NETWORK-FIRST pro esqueleto do app (HTML/CSS/JS): busca sempre a versão mais
+// nova na rede primeiro; só cai pro cache se estiver offline ou a rede falhar.
+// Antes era cache-first, o que deixava o navegador preso numa versão antiga do
+// app.js mesmo depois de eu corrigir bugs e publicar no GitHub — corrigido em
+// 26/07/2026 depois de travar o "Painel do dia" e o "Radar de notícias".
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.ok) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse.clone()));
-          }
-          return networkResponse;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.ok) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse.clone()));
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
 
