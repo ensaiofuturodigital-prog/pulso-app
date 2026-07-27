@@ -535,14 +535,31 @@ async function loadDailySummary(dateStr) {
           const releasedToday = !!(fetchedDateBR && fetchedDateBR === dateStr);
           const trend = rel ? trendClass(rel.actual_value, rel.previous_value) : 'flat';
 
-          if (s && trend !== 'flat') {
-            const prob = trend === 'up' ? s.pct_usd_up_after_indicator_up : s.pct_usd_up_after_indicator_down;
-            if (prob !== null && prob !== undefined && (s.sample_size || 0) >= 5) {
+          if (s && (s.sample_size || 0) >= 5) {
+            // Se já sabemos a tendência do último valor (subiu/desceu), usa o cenário
+            // certo. Se não sabemos ainda (ainda não saiu, ou é uma série que raramente
+            // muda dia a dia, tipo taxa de juros fixa) — média dos dois cenários, em vez
+            // de descartar o indicador inteiro do card de cima. Corrigido em 27/07/2026:
+            // antes, indicadores como "Taxa de Juros do Fed" tinham o cálculo detalhado
+            // certinho na lista de baixo, mas sumiam do card agregado por causa disso.
+            let prob, probIbov;
+            if (trend === 'up') {
+              prob = s.pct_usd_up_after_indicator_up;
+              probIbov = s.pct_ibov_up_after_indicator_up;
+            } else if (trend === 'down') {
+              prob = s.pct_usd_up_after_indicator_down;
+              probIbov = s.pct_ibov_up_after_indicator_down;
+            } else {
+              const pUp = s.pct_usd_up_after_indicator_up, pDown = s.pct_usd_up_after_indicator_down;
+              prob = (pUp !== null && pUp !== undefined && pDown !== null && pDown !== undefined) ? (pUp + pDown) / 2 : (pUp ?? pDown);
+              const pUpI = s.pct_ibov_up_after_indicator_up, pDownI = s.pct_ibov_up_after_indicator_down;
+              probIbov = (pUpI !== null && pUpI !== undefined && pDownI !== null && pDownI !== undefined) ? (pUpI + pDownI) / 2 : (pUpI ?? pDownI);
+            }
+            if (prob !== null && prob !== undefined) {
               weightedSum += prob * s.sample_size;
               weightTotal += s.sample_size;
             }
-            const probIbov = trend === 'up' ? s.pct_ibov_up_after_indicator_up : s.pct_ibov_up_after_indicator_down;
-            if (probIbov !== null && probIbov !== undefined && (s.sample_size || 0) >= 5) {
+            if (probIbov !== null && probIbov !== undefined) {
               weightedSumIbov += probIbov * s.sample_size;
               weightTotalIbov += s.sample_size;
             }
