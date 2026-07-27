@@ -38,6 +38,14 @@ const INDICATORS = [
   { code: 'WCESTUS1', name_pt: 'Estoques de Petróleo Bruto (EUA)', description_pt: 'Estoque semanal de petróleo bruto nos EUA (EIA). Estoque subindo mais que o esperado costuma pressionar o preço do petróleo pra baixo.', frequency: 'weekly' },
   { code: 'WALCL', name_pt: 'Balanço Patrimonial do Federal Reserve', description_pt: 'Total de ativos do Fed. Mostra se o Fed está injetando (QE) ou retirando (QT) dinheiro do sistema.', frequency: 'weekly' },
   { code: 'WRESBAL', name_pt: 'Saldos de Reservas Bancárias no Fed', description_pt: 'Dinheiro que os bancos têm parado no Fed. Queda forte pode sinalizar aperto de liquidez no sistema financeiro americano.', frequency: 'weekly' },
+
+  // Adicionados em 27/07/2026 a partir da análise do calendário histórico
+  // (2020-2026) que o Paulão forneceu — eram os nomes de evento mais
+  // frequentes ainda sem indicador correspondente no Pulso.
+  { code: 'DGORDER', name_pt: 'Pedidos de Bens Duráveis (EUA)', description_pt: 'Encomendas de produtos que duram 3+ anos (carros, máquinas, eletrônicos). Antecipa investimento das empresas.', frequency: 'monthly' },
+  { code: 'PI', name_pt: 'Renda Pessoal (EUA)', description_pt: 'Quanto o americano está ganhando no total. Base pro consumo futuro.', frequency: 'monthly' },
+  { code: 'PCE', name_pt: 'Gastos Pessoais de Consumo (EUA)', description_pt: 'Quanto o americano está gastando. ~70% do PIB dos EUA vem daqui.', frequency: 'monthly' },
+  { code: 'JTSJOL', name_pt: 'Vagas de Emprego - JOLTs (EUA)', description_pt: 'Quantidade de vagas abertas nos EUA. Fed observa de perto pra medir aperto no mercado de trabalho.', frequency: 'monthly' },
 ];
 
 // Busca o máximo de histórico que o FRED permitir (cada série tem uma data de início diferente)
