@@ -488,6 +488,72 @@ button, input, select {
   margin: 8px 0 0;
 }
 
+.ingest-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.ingest-card label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.ingest-card input[type="password"] {
+  width: 100%;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+}
+.ingest-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+.ingest-card textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 12px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.ingest-btn {
+  margin-top: 10px;
+  padding: 10px 18px;
+  background: var(--amber);
+  color: #1a1206;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.ingest-btn:disabled { opacity: 0.6; cursor: default; }
+.ingest-result {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.ingest-result:empty { display: none; }
+
 /* ---------- DAILY SUMMARY BANNER ---------- */
 .daily-summary {
   background: linear-gradient(135deg, rgba(226,179,60,0.10), rgba(226,179,60,0.02));
