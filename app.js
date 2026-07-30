@@ -765,6 +765,55 @@ function renderHolidayCalendar() {
   document.getElementById('calNext').addEventListener('click', () => { calState.setMonth(calState.getMonth() + 1); renderHolidayCalendar(); });
 }
 
+/* ---------------- ATUALIZAR DADOS (colar manual) ---------------- */
+async function sendIngest(body, resultElId, btnEl) {
+  const resultEl = document.getElementById(resultElId);
+  const originalLabel = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = 'Processando...';
+  resultEl.textContent = '';
+  try {
+    const res = await fetch('/api/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      resultEl.textContent = `❌ Erro: ${data.error || res.statusText}`;
+    } else {
+      resultEl.textContent = JSON.stringify(data, null, 2);
+    }
+  } catch (err) {
+    resultEl.textContent = `❌ Falha de rede: ${err.message}`;
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = originalLabel;
+  }
+}
+
+function wireIngestPanel() {
+  const passwordEl = document.getElementById('ingestPassword');
+
+  const calBtn = document.getElementById('ingestCalendarBtn');
+  calBtn.addEventListener('click', () => {
+    const text = document.getElementById('ingestCalendarText').value;
+    sendIngest({ password: passwordEl.value, type: 'calendar', text }, 'ingestCalendarResult', calBtn);
+  });
+
+  const wdoBtn = document.getElementById('ingestWdoBtn');
+  wdoBtn.addEventListener('click', () => {
+    const text = document.getElementById('ingestWdoText').value;
+    sendIngest({ password: passwordEl.value, type: 'price', asset: 'WDO', text }, 'ingestWdoResult', wdoBtn);
+  });
+
+  const winBtn = document.getElementById('ingestWinBtn');
+  winBtn.addEventListener('click', () => {
+    const text = document.getElementById('ingestWinText').value;
+    sendIngest({ password: passwordEl.value, type: 'price', asset: 'WIN', text }, 'ingestWinResult', winBtn);
+  });
+}
+
 /* ---------------- INIT ---------------- */
 // loadTicker(); // removido a pedido: DXY/Treasury/Petróleo não aparecem mais no topo
 loadLastUpdate();
@@ -776,6 +825,7 @@ loadDailySummary(todayStrBR());
 renderHolidayCalendar();
 document.getElementById('enablePushBtn').addEventListener('click', enablePush);
 checkPushStatus();
+wireIngestPanel();
 
 /* ---------------- PWA: registra o service worker ---------------- */
 if ('serviceWorker' in navigator) {
