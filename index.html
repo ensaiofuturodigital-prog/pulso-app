@@ -62,6 +62,10 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12 L18 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Radar de Notícias</span>
       </button>
+      <button class="tab-btn" data-tab="atualizar">
+        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 4v4h-4M6 20v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Atualizar Dados</span>
+      </button>
     </nav>
 
     <!-- MAIN -->
@@ -126,6 +130,43 @@
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
+        </div>
+      </section>
+
+      <!-- ATUALIZAR DADOS -->
+      <section class="panel" id="panel-atualizar">
+        <div class="panel-head">
+          <h1>Atualizar dados</h1>
+          <p>Cole aqui o calendário econômico e as cotações de WDO/WIN. Isso substitui os robôs automáticos — o Pulso só sabe o que você colar.</p>
+        </div>
+
+        <div class="ingest-card">
+          <label for="ingestPassword">Senha</label>
+          <input type="password" id="ingestPassword" placeholder="Senha de atualização" autocomplete="off">
+        </div>
+
+        <div class="ingest-card">
+          <h2 class="section-subhead">Calendário econômico (Trading Economics)</h2>
+          <p class="ingest-hint">Copie a tabela do calendário (com as colunas Actual/Previous/Consensus/Forecast) e cole abaixo.</p>
+          <textarea id="ingestCalendarText" rows="10" placeholder="Cole aqui o texto copiado do Trading Economics..."></textarea>
+          <button type="button" class="ingest-btn" id="ingestCalendarBtn">Processar e salvar calendário</button>
+          <pre class="ingest-result" id="ingestCalendarResult"></pre>
+        </div>
+
+        <div class="ingest-card">
+          <h2 class="section-subhead">Cotação Mini Dólar (WDO)</h2>
+          <p class="ingest-hint">Copie a tabela de "Dados Históricos" do Investing.com (Data, Último, Abertura, Máxima, Mínima) e cole abaixo.</p>
+          <textarea id="ingestWdoText" rows="8" placeholder="Cole aqui o histórico do WDO..."></textarea>
+          <button type="button" class="ingest-btn" id="ingestWdoBtn">Processar e salvar WDO</button>
+          <pre class="ingest-result" id="ingestWdoResult"></pre>
+        </div>
+
+        <div class="ingest-card">
+          <h2 class="section-subhead">Cotação Mini Índice (WIN)</h2>
+          <p class="ingest-hint">Mesmo formato, só que da página do WIN/Ibovespa Futuro.</p>
+          <textarea id="ingestWinText" rows="8" placeholder="Cole aqui o histórico do WIN..."></textarea>
+          <button type="button" class="ingest-btn" id="ingestWinBtn">Processar e salvar WIN</button>
+          <pre class="ingest-result" id="ingestWinResult"></pre>
         </div>
       </section>
 
