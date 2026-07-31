@@ -457,33 +457,16 @@ async function loadDailySummary(dateStr) {
   head.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
 
   try {
-    // Dólar à vista pra essa data: busca e mostra sempre, não depende de ter
-    // indicador econômico agendado no mesmo dia (antes ficava preso a isso).
-    let usdIndId = null;
-    try {
-      const { data: usdInd } = await supabase.from('indicators').select('id').eq('code', 'BCB_USDBRL').maybeSingle();
-      usdIndId = usdInd ? usdInd.id : null;
-    } catch { /* segue sem conferência retroativa se não achar */ }
-
-    let usdRelease = null;
-    let usdPrice = null;
-    if (usdIndId) {
-      const { data: usdRows } = await supabase
-        .from('indicator_releases')
-        .select('*')
-        .eq('indicator_id', usdIndId)
-        .eq('release_date', dateStr)
-        .limit(1);
-      usdRelease = usdRows && usdRows[0] ? usdRows[0] : null;
-
-      const { data: priceRows } = await supabase
-        .from('price_daily')
-        .select('open,high,low,close')
-        .eq('asset', 'USDBRL')
-        .eq('price_date', dateStr)
-        .limit(1);
-      usdPrice = priceRows && priceRows[0] ? priceRows[0] : null;
-    }
+    // Card de preço pra essa data: mostra o candle do WDO (agora é o contrato
+    // futuro real que você cola em "Atualizar Dados", não mais um proxy de câmbio).
+    // Trocado em 31/07/2026 quando o histórico de USDBRL foi removido do banco.
+    const { data: priceRows } = await supabase
+      .from('price_daily')
+      .select('open,high,low,close')
+      .eq('asset', 'WDO')
+      .eq('price_date', dateStr)
+      .limit(1);
+    const wdoPrice = priceRows && priceRows[0] ? priceRows[0] : null;
 
     const { data: scheduled, error } = await supabase
       .from('release_schedule')
@@ -598,21 +581,21 @@ async function loadDailySummary(dateStr) {
 
     renderTodayProbCard(aggProb, aggProbIbov, weightTotal, weightTotalIbov);
 
-    // Card do dólar à vista: mostra sempre que houver candle pra essa data,
+    // Card do WDO: mostra sempre que houver candle pra essa data,
     // com selo de acerto/erro só quando dá pra comparar com uma probabilidade do dia.
     let retroHtml = '';
-    if (usdPrice && usdPrice.open != null) {
-      const priceGrid = `<p class="price-grid-label">Dólar à vista (USD/BRL) — referência de mercado, não é a cotação do contrato futuro WDO</p>
+    if (wdoPrice && wdoPrice.open != null) {
+      const priceGrid = `<p class="price-grid-label">Mini Dólar (WDO) — candle do dia</p>
         <div class="price-grid">
-          <div class="price-item"><span class="price-label">Abertura</span><span class="price-value">R$ ${fmtNum(usdPrice.open)}</span></div>
-          <div class="price-item"><span class="price-label">Fechamento</span><span class="price-value">R$ ${fmtNum(usdPrice.close)}</span></div>
-          <div class="price-item"><span class="price-label">Máxima</span><span class="price-value">R$ ${fmtNum(usdPrice.high)}</span></div>
-          <div class="price-item"><span class="price-label">Mínima</span><span class="price-value">R$ ${fmtNum(usdPrice.low)}</span></div>
+          <div class="price-item"><span class="price-label">Abertura</span><span class="price-value">R$ ${fmtNum(wdoPrice.open)}</span></div>
+          <div class="price-item"><span class="price-label">Fechamento</span><span class="price-value">R$ ${fmtNum(wdoPrice.close)}</span></div>
+          <div class="price-item"><span class="price-label">Máxima</span><span class="price-value">R$ ${fmtNum(wdoPrice.high)}</span></div>
+          <div class="price-item"><span class="price-label">Mínima</span><span class="price-value">R$ ${fmtNum(wdoPrice.low)}</span></div>
         </div>`;
 
       let bannerClass = 'retro-pending';
-      if (usdRelease && aggProb !== null) {
-        const actualTrend = trendClass(usdRelease.actual_value, usdRelease.previous_value);
+      if (aggProb !== null) {
+        const actualTrend = trendClass(wdoPrice.close, wdoPrice.open);
         if (actualTrend !== 'flat') {
           const predictedUp = aggProb >= 50;
           const actualUp = actualTrend === 'up';
@@ -622,7 +605,7 @@ async function loadDailySummary(dateStr) {
       retroHtml = `<div class="retro-banner ${bannerClass}">${priceGrid}</div>`;
     } else {
       const isFuture = dateStr > todayStrBR();
-      retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem candle do dólar à vista coletado pra essa data (fim de semana, feriado, ou o robô ainda não rodou).'}</div>`;
+      retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem candle do WDO pra essa data — cole o preço em "Atualizar Dados".'}</div>`;
     }
     retroEl.innerHTML = retroHtml;
   } catch (err) {
