@@ -5,6 +5,15 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Evita a corrida entre deploys: se chegar um push novo enquanto o deploy
+# anterior ainda está rodando, ele espera na fila em vez de rodar em paralelo.
+# Sem isso, um deploy de um commit mais antigo podia terminar DEPOIS de um mais
+# novo e "vencer" virando a versão em produção por engano (foi o que aconteceu
+# em 01/08/2026 com 3 pushes em sequência rápida).
+concurrency:
+  group: deploy-vercel-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
