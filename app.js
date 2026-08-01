@@ -476,15 +476,39 @@ async function loadDailySummary(dateStr) {
 
     let aggProb = null, aggProbIbov = null, weightTotal = 0, weightTotalIbov = 0;
 
+    // Baseline: quando não tem indicador de média/alta importância agendado
+    // pra esse dia, usa a probabilidade histórica calculada em cima de dias
+    // sem divulgação (ver scripts/compute-baseline-stats.js). Nunca mistura
+    // com o número "puxado por indicador" — ou é um, ou é outro.
+    async function applyBaseline() {
+      const weekday = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+      const { data: baseRows } = await supabase.from('baseline_stats').select('*').in('asset', ['WDO', 'WIN']);
+      const pick = (asset) => {
+        const rows = (baseRows || []).filter(r => r.asset === asset);
+        return rows.find(r => r.weekday === weekday) || rows.find(r => r.weekday === null) || null;
+      };
+      const wdoBase = pick('WDO');
+      const winBase = pick('WIN');
+      if (wdoBase) { aggProb = Math.round(wdoBase.pct_up); weightTotal = wdoBase.sample_size; }
+      if (winBase) { aggProbIbov = Math.round(winBase.pct_up); weightTotalIbov = winBase.sample_size; }
+      return !!(wdoBase || winBase);
+    }
+
     if (!scheduled || scheduled.length === 0) {
-      itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
+      const gotBaseline = await applyBaseline();
+      itemsEl.innerHTML = gotBaseline
+        ? '<p class="stats-empty">Nenhum indicador de média/alta importância divulgado nessa data — o card acima usa a probabilidade histórica de dias sem divulgação (ver método no card).</p>'
+        : '<p class="stats-empty">Sem divulgações agendadas nessa data, e ainda não tem baseline calculado. Use as setas pra navegar por outras datas.</p>';
     } else {
       const ids = scheduled.map(s => s.indicator_id);
       const { data: indicatorsRaw } = await supabase.from('indicators').select('*').in('id', ids);
       const indicators = (indicatorsRaw || []).filter(i => !NON_DISPLAY_CODES.includes(i.code));
 
       if (indicators.length === 0) {
-        itemsEl.innerHTML = '<p class="stats-empty">Sem divulgações agendadas dos indicadores que acompanhamos nessa data, pelo calendário do FRED. Use as setas pra navegar por outras datas.</p>';
+        const gotBaseline = await applyBaseline();
+        itemsEl.innerHTML = gotBaseline
+          ? '<p class="stats-empty">Nenhum indicador de média/alta importância divulgado nessa data — o card acima usa a probabilidade histórica de dias sem divulgação (ver método no card).</p>'
+          : '<p class="stats-empty">Sem divulgações agendadas nessa data, e ainda não tem baseline calculado. Use as setas pra navegar por outras datas.</p>';
       } else {
         const { data: statsRows } = await supabase.from('indicator_stats').select('*').in('indicator_id', indicators.map(i => i.id));
         const statsMap = {};
