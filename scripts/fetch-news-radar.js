@@ -26,12 +26,23 @@ const FEEDS = [
 // feeds acima (rede de segurança contra fofoca/esporte que às vezes escapa
 // da categorização do Google).
 const EXCLUDE_KEYWORDS = [
-  'futebol', 'campeonato', 'copa do mundo', 'libertadores', 'brasileirão', 'gol ', 'jogador', 'técnico do',
+  // Esportes em geral (ampliado em 02/08/2026 — antes só pegava futebol)
+  'futebol', 'campeonato', 'copa do mundo', 'libertadores', 'brasileirão', 'brasileirao', 'gol ', 'jogador', 'técnico do', 'tecnico do',
+  'esporte', 'esportes', 'olimpíada', 'olimpiada', 'olimpíadas', 'olimpiadas', 'paralimpíada', 'paralimpiada',
+  'seleção brasileira', 'selecao brasileira', 'vôlei', 'volei', 'basquete', 'nba ', 'nfl ', 'tênis', 'tenis',
+  'fórmula 1', 'formula 1', 'f1 ', 'mma', 'ufc', 'boxe', 'atleta', 'medalha de ouro', 'medalha de prata', 'medalha de bronze',
+  'natação', 'natacao', 'ginástica', 'ginastica', 'maratona', 'corrida de rua',
+  // Fofoca / entretenimento
   'novela', 'bbb', 'big brother', 'reality show', 'celebridade', 'famosos', 'famoso ', 'famosa ',
   'grammy', 'oscar', 'cantor', 'cantora', 'ator ', 'atriz', 'horóscopo', 'receita de', 'signo',
   'namoro', 'affair', 'clima tempo', 'previsão do tempo',
+  // Beleza / estilo de vida (novo em 02/08/2026)
+  'beleza', 'estética', 'estetica', 'maquiagem', 'skincare', 'cuidados com a pele', 'cabelo', 'penteado',
+  'moda ', 'desfile de moda', 'passarela', 'tendência de moda', 'tendencia de moda', 'dieta ', 'emagrecer',
+  // Loteria (ampliado com mais jogos)
   'loteria', 'loterias', 'lotofácil', 'lotofacil', 'mega-sena', 'megasena', 'quina', 'lotomania',
-  'dupla sena', 'timemania', 'loteca', 'dezenas sorteadas', 'resultado do sorteio',
+  'dupla sena', 'timemania', 'loteca', 'dezenas sorteadas', 'resultado do sorteio', 'dia de sorte',
+  'super sete', 'loteria federal',
 ];
 
 // Palavras que confirmam que é conteúdo de mercado/economia (usado pra
