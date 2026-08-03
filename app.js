@@ -325,44 +325,7 @@ async function loadOvernightNews() {
   }
 }
 
-/* ---------------- TICKER: ATIVOS CORRELACIONADOS ---------------- */
-async function loadTicker() {
-  const el = document.getElementById('correlatedTicker');
-  if (!el) return;
-  const CODES = ['DTWEXBGS', 'DGS10', 'DCOILWTICO'];
-  try {
-    const { data: indicators, error } = await supabase.from('indicators').select('*').in('code', CODES);
-    if (error) throw error;
-    if (!indicators || indicators.length === 0) { el.innerHTML = ''; return; }
 
-    const byCode = {};
-    indicators.forEach(i => byCode[i.code] = i);
-
-    const items = await Promise.all(CODES.map(async (code) => {
-      const ind = byCode[code];
-      if (!ind) return null;
-      const { data } = await supabase
-        .from('indicator_releases')
-        .select('*')
-        .eq('indicator_id', ind.id)
-        .order('release_date', { ascending: false })
-        .limit(1);
-      const rel = data && data[0];
-      if (!rel) return null;
-      const trend = trendClass(rel.actual_value, rel.previous_value);
-      return { name: ind.name_pt, value: rel.actual_value, trend };
-    }));
-
-    el.innerHTML = items.filter(Boolean).map(it => `
-      <div class="ticker-item">
-        <span class="ticker-name">${it.name}</span>
-        <span class="ticker-value ${it.trend}">${fmtNum(it.value)} ${it.trend === 'up' ? '▲' : it.trend === 'down' ? '▼' : '—'}</span>
-      </div>`).join('');
-  } catch (err) {
-    console.error(err);
-    el.innerHTML = '';
-  }
-}
 
 /* ---------------- SELO DE ÚLTIMA ATUALIZAÇÃO ---------------- */
 async function loadLastUpdate() {
@@ -822,7 +785,6 @@ function wireIngestPanel() {
 }
 
 /* ---------------- INIT ---------------- */
-// loadTicker(); // removido a pedido: DXY/Treasury/Petróleo não aparecem mais no topo
 loadLastUpdate();
 loadTimeline();
 loadOvernightNews();
