@@ -49,6 +49,18 @@ const EXCLUDE_KEYWORDS = [
   'k-pop', 'kpop', 'anime', 'colecionável', 'colecionavel', 'brinde colecionável', 'brinde colecionavel',
   'combo de brinquedo', 'linha de brinquedos', 'parceria com anime', 'crossover com anime', 'cardápio especial',
   'cardapio especial', 'edição limitada de brinquedo', 'edicao limitada de brinquedo',
+  // Entretenimento em geral (novo em 02/08/2026: cinema, streaming, games,
+  // shows, parques temáticos)
+  'filme', 'cinema', 'estreia de', 'trailer', 'temporada de', 'série da netflix', 'serie da netflix',
+  'netflix', 'hbo max', 'disney+', 'disney plus', 'amazon prime video', 'streaming',
+  'videogame', 'video game', 'lançamento do jogo', 'lancamento do jogo', 'gameplay', 'dlc',
+  'show de', 'turnê', 'turne', 'ingressos para', 'festival de música', 'festival de musica',
+  'parque temático', 'parque tematico', 'disneyland', 'parque de diversões', 'parque de diversoes',
+  'quadrinho', 'gibi', 'mangá', 'manga ',
+  // Marketing de produto / lançamento genérico (não-financeiro)
+  'lançamento do novo', 'lancamento do novo', 'review do', 'unboxing', 'conheça o novo', 'conheca o novo',
+  'chegou ao brasil', 'promoção de', 'promocao de', 'desconto de', 'cupom de desconto', 'liquidação de',
+  'liquidacao de',
 ];
 
 // Palavras que confirmam que é conteúdo de mercado/economia (usado pra
