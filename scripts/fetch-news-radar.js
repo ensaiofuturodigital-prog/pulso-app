@@ -43,6 +43,12 @@ const EXCLUDE_KEYWORDS = [
   'loteria', 'loterias', 'lotofácil', 'lotofacil', 'mega-sena', 'megasena', 'quina', 'lotomania',
   'dupla sena', 'timemania', 'loteca', 'dezenas sorteadas', 'resultado do sorteio', 'dia de sorte',
   'super sete', 'loteria federal',
+  // Pop culture / marketing de produto (novo em 02/08/2026: "K-pop no cardápio
+  // do McDonald's" e parecidos — mira no TIPO de conteúdo, não na marca, pra
+  // não bloquear notícia financeira legítima que cite a mesma empresa)
+  'k-pop', 'kpop', 'anime', 'colecionável', 'colecionavel', 'brinde colecionável', 'brinde colecionavel',
+  'combo de brinquedo', 'linha de brinquedos', 'parceria com anime', 'crossover com anime', 'cardápio especial',
+  'cardapio especial', 'edição limitada de brinquedo', 'edicao limitada de brinquedo',
 ];
 
 // Palavras que confirmam que é conteúdo de mercado/economia (usado pra
