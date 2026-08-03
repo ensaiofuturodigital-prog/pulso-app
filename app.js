@@ -257,10 +257,23 @@ async function loadTimeline() {
 
 /* ---------------- RADAR: NOTÍCIAS DE MERCADO (24H) ---------------- */
 const BREAKING_KEYWORDS = [
+  // Geopolítica / desastre / violência
   'atentado', 'morte', 'morreu', 'faleceu', 'guerra', 'ataque', 'acidente', 'renúncia', 'renuncia',
   'golpe', 'declaração de guerra', 'terremoto', 'tsunami', 'crise', 'assassinato', 'explosão', 'explosao',
   'incêndio', 'incendio', 'sequestro', 'rendição', 'rendicao', 'anúncio emergencial', 'anuncio emergencial',
-  'colapso', 'pânico', 'panico',
+  'colapso', 'pânico', 'panico', 'invasão', 'invasao', 'atentado terrorista', 'estado de emergência', 'estado de emergencia',
+  'evacuação', 'evacuacao', 'catástrofe', 'catastrofe',
+  // Choque de mercado / financeiro (ampliado em 02/08/2026 a pedido do Paulão,
+  // depois de "calote da Argentina" e "petróleo despenca" não terem sido
+  // marcados como breaking mesmo sendo relevantes pra WDO/WIN)
+  'calote', 'default', 'moratória', 'moratoria', 'quebra', 'desabamento', 'despenca', 'despencou',
+  'tomba', 'tombou', 'afunda', 'afundou', 'dispara', 'disparou', 'disparada', 'circuit breaker',
+  'trava o pregão', 'suspensão do pregão', 'suspensao do pregao', 'derrete', 'derreteu',
+  'recessão', 'recessao', 'calamidade', 'insolvência', 'insolvencia', 'liquidação forçada', 'liquidacao forcada',
+  'corrida bancária', 'corrida bancaria', 'intervenção', 'intervencao', 'confisco',
+  // Escândalo / investigação de peso (política, corporativo)
+  'escândalo', 'escandalo', 'investigação', 'investigacao', 'indiciado', 'indiciada', 'impeachment',
+  'cpi', 'operação da polícia federal', 'operacao da policia federal', 'prisão de', 'prisao de',
 ];
 function isBreaking(title) {
   const t = title.toLowerCase();
