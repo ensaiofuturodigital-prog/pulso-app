@@ -8,7 +8,40 @@ import { resolveCode } from './lib/indicatorMap.js';
 //   SUPABASE_URL            (mesma URL de sempre)
 //   SUPABASE_SERVICE_KEY     (a chave service_role — tem permissão de escrita)
 //   INGEST_PASSWORD          (senha simples que só o Paulão sabe)
+//   GITHUB_ACTIONS_TOKEN     (token do GitHub só com permissão de Actions:
+//                             write, pra disparar o recálculo sozinho)
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+const GH_OWNER = 'ensaiofuturodigital-prog';
+const GH_REPO = 'pulso-app';
+
+// Dispara o recálculo de probabilidade sozinho, sempre que um "Atualizar
+// Dados" terminar com sucesso — pra nunca mais precisar ir no GitHub Actions
+// apertar nada na mão depois de colar dado novo.
+async function triggerRecompute() {
+  const token = process.env.GITHUB_ACTIONS_TOKEN;
+  if (!token) return { disparado: false, motivo: 'GITHUB_ACTIONS_TOKEN não configurado na Vercel' };
+
+  const workflows = ['compute-stats.yml', 'compute-baseline-stats.yml'];
+  const results = {};
+  for (const wf of workflows) {
+    try {
+      const r = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${wf}/dispatches`, {
+        method: 'POST',
+        headers: {
+          Authorization: `token ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/vnd.github+json',
+        },
+        body: JSON.stringify({ ref: 'main' }),
+      });
+      results[wf] = r.status === 204 ? 'disparado' : `erro HTTP ${r.status}`;
+    } catch (err) {
+      results[wf] = `falha: ${err.message}`;
+    }
+  }
+  return { disparado: true, workflows: results };
+}
 
 function chunk(arr, size) {
   const out = [];
@@ -37,6 +70,7 @@ export default async function handler(req, res) {
   try {
     if (type === 'calendar') {
       const result = await ingestCalendar(text);
+      result.recalculo = await triggerRecompute();
       res.status(200).json(result);
       return;
     }
@@ -46,6 +80,7 @@ export default async function handler(req, res) {
         return;
       }
       const result = await ingestPriceForAsset(text, asset);
+      result.recalculo = await triggerRecompute();
       res.status(200).json(result);
       return;
     }
