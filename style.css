@@ -625,6 +625,7 @@ button, input, select {
 }
 .retro-banner.retro-match { border-color: var(--teal); background: var(--teal-dim); color: var(--text); }
 .retro-banner.retro-miss { border-color: var(--coral); background: var(--coral-dim); color: var(--text); }
+.retro-banner.retro-mixed { border-color: var(--amber); background: rgba(242,184,75,0.1); color: var(--text); }
 .retro-banner.retro-pending { color: var(--text-dim); }
 .price-grid-label { font-size: 12px; color: var(--text-faint); margin: 0 0 8px; font-style: italic; }
 .price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
@@ -632,6 +633,43 @@ button, input, select {
 .price-label { font-size: 12.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
 .price-value { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: var(--text); }
 .ci-range { font-size: 12px; color: var(--text-faint); font-weight: 400; margin-left: 2px; }
+
+/* Layout do card de candle + resultado do dia (08/08/2026) */
+.retro-layout { display: flex; gap: 24px; flex-wrap: wrap; align-items: stretch; }
+.retro-prices { flex: 1 1 300px; display: flex; flex-direction: column; gap: 14px; }
+.retro-prices .price-grid-label:not(:first-child) { margin-top: 2px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.result-panel { flex: 1 1 260px; border-left: 1px dashed var(--border); padding-left: 20px; }
+.result-panel-label { font-size: 12px; color: var(--text-faint); margin: 0 0 10px; font-style: italic; }
+.result-item { display: flex; flex-direction: column; gap: 3px; padding: 8px 0; }
+.result-item + .result-item { border-top: 1px dashed var(--border); }
+.result-asset { font-size: 13.5px; font-weight: 600; color: var(--text-dim); }
+.result-badge { font-size: 15.5px; font-weight: 700; }
+.result-hit .result-badge { color: var(--teal); }
+.result-miss .result-badge { color: var(--coral); }
+.result-detail { font-size: 13px; color: var(--text-dim); }
+.result-msg { font-size: 13px; color: var(--text-faint); }
+
+/* Placar geral (08/08/2026) */
+.placar-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px 18px; margin-bottom: 18px; }
+.placar-summary-blocks { display: flex; gap: 28px; flex-wrap: wrap; }
+.placar-block { flex: 1; min-width: 200px; }
+.placar-asset { display: block; font-weight: 600; font-size: 14.5px; color: var(--text-dim); margin-bottom: 4px; }
+.placar-pct { display: block; font-family: var(--font-mono); font-size: 30px; font-weight: 700; color: var(--gold); }
+.placar-meta { font-size: 13.5px; color: var(--text-dim); }
+.placar-note { font-size: 12.5px; color: var(--text-faint); margin: 14px 0 0; font-style: italic; }
+.placar-list { display: flex; flex-direction: column; gap: 1px; }
+.placar-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.placar-row + .placar-row { margin-top: 6px; }
+.placar-row.placar-hit { border-left: 3px solid var(--teal); }
+.placar-row.placar-miss { border-left: 3px solid var(--coral); }
+.placar-row-date { font-family: var(--font-mono); font-size: 13.5px; color: var(--text-dim); min-width: 60px; }
+.placar-row-asset { font-weight: 700; font-size: 13px; min-width: 36px; }
+.placar-row-pred, .placar-row-actual { font-size: 13.5px; color: var(--text-dim); }
+.placar-row-badge { margin-left: auto; font-size: 16px; }
 
 /* ---------- SELO DE CONFIABILIDADE ---------- */
 .conf-badge {
