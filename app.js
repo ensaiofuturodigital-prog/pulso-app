@@ -444,6 +444,16 @@ async function loadDailySummary(dateStr) {
       .limit(1);
     const wdoPrice = priceRows && priceRows[0] ? priceRows[0] : null;
 
+    // Candle do WIN também — adicionado em 08/08/2026 junto com o card de
+    // "Resultado do dia" (acerto/erro), que precisa dos dois ativos.
+    const { data: winPriceRows } = await supabase
+      .from('price_daily')
+      .select('open,high,low,close')
+      .eq('asset', 'WIN')
+      .eq('price_date', dateStr)
+      .limit(1);
+    const winPrice = winPriceRows && winPriceRows[0] ? winPriceRows[0] : null;
+
     const { data: scheduled, error } = await supabase
       .from('release_schedule')
       .select('indicator_id')
@@ -583,31 +593,77 @@ async function loadDailySummary(dateStr) {
 
     renderTodayProbCard(aggProb, aggProbIbov, weightTotal, weightTotalIbov);
 
-    // Card do WDO: mostra sempre que houver candle pra essa data,
-    // com selo de acerto/erro só quando dá pra comparar com uma probabilidade do dia.
-    let retroHtml = '';
-    if (wdoPrice && wdoPrice.open != null) {
-      const priceGrid = `<p class="price-grid-label">Mini Dólar (WDO) — candle do dia</p>
-        <div class="price-grid">
-          <div class="price-item"><span class="price-label">Abertura</span><span class="price-value">R$ ${fmtNum(wdoPrice.open)}</span></div>
-          <div class="price-item"><span class="price-label">Fechamento</span><span class="price-value">R$ ${fmtNum(wdoPrice.close)}</span></div>
-          <div class="price-item"><span class="price-label">Máxima</span><span class="price-value">R$ ${fmtNum(wdoPrice.high)}</span></div>
-          <div class="price-item"><span class="price-label">Mínima</span><span class="price-value">R$ ${fmtNum(wdoPrice.low)}</span></div>
-        </div>`;
-
-      let bannerClass = 'retro-pending';
-      if (aggProb !== null) {
-        const actualTrend = trendClass(wdoPrice.close, wdoPrice.open);
-        if (actualTrend !== 'flat') {
-          const predictedUp = aggProb >= 50;
-          const actualUp = actualTrend === 'up';
-          bannerClass = predictedUp === actualUp ? 'retro-match' : 'retro-miss';
-        }
+    // Card de candle + resultado: mostra sempre que houver pelo menos um
+    // candle (WDO ou WIN) pra essa data. Redesenhado em 08/08/2026 pra
+    // preencher o espaço vazio à direita com um veredito explícito de
+    // acerto/erro (antes só mudava a cor da borda, sem dizer o motivo),
+    // e estendido pro WIN, que antes não tinha candle nenhum aqui.
+    function priceGridHtml(label, price) {
+      if (!price || price.open == null) {
+        return `<p class="price-grid-label">${label} — sem candle pra essa data</p>`;
       }
-      retroHtml = `<div class="retro-banner ${bannerClass}">${priceGrid}</div>`;
+      return `<p class="price-grid-label">${label} — candle do dia</p>
+        <div class="price-grid">
+          <div class="price-item"><span class="price-label">Abertura</span><span class="price-value">R$ ${fmtNum(price.open)}</span></div>
+          <div class="price-item"><span class="price-label">Fechamento</span><span class="price-value">R$ ${fmtNum(price.close)}</span></div>
+          <div class="price-item"><span class="price-label">Máxima</span><span class="price-value">R$ ${fmtNum(price.high)}</span></div>
+          <div class="price-item"><span class="price-label">Mínima</span><span class="price-value">R$ ${fmtNum(price.low)}</span></div>
+        </div>`;
+    }
+
+    function resultBlock(label, price, prob) {
+      if (!price || price.open == null) {
+        return `<div class="result-item result-empty"><span class="result-asset">${label}</span><span class="result-msg">Sem candle pra essa data.</span></div>`;
+      }
+      const actualTrend = trendClass(price.close, price.open);
+      if (actualTrend === 'flat') {
+        return `<div class="result-item result-empty"><span class="result-asset">${label}</span><span class="result-msg">Fechou igual à abertura — sem direção clara pra avaliar.</span></div>`;
+      }
+      const actualUp = actualTrend === 'up';
+      if (prob === null || prob === undefined) {
+        return `<div class="result-item result-empty"><span class="result-asset">${label}</span><span class="result-msg">Fechou em ${actualUp ? 'Alta' : 'Baixa'}, mas não tinha previsão calculada pra esse dia.</span></div>`;
+      }
+      const predictedUp = prob >= 50;
+      const hit = predictedUp === actualUp;
+      const pctShown = predictedUp ? prob : Math.round((100 - prob) * 10) / 10;
+      return `
+        <div class="result-item ${hit ? 'result-hit' : 'result-miss'}">
+          <span class="result-asset">${label}</span>
+          <span class="result-badge">${hit ? '✅ Acertou' : '❌ Errou'}</span>
+          <span class="result-detail">Previsão: ${predictedUp ? 'Alta' : 'Baixa'} ${pctShown}% · Fechou em ${actualUp ? 'Alta' : 'Baixa'}</span>
+        </div>`;
+    }
+
+    let retroHtml = '';
+    const hasWdoCandle = wdoPrice && wdoPrice.open != null;
+    const hasWinCandle = winPrice && winPrice.open != null;
+    if (hasWdoCandle || hasWinCandle) {
+      const wdoTrend = hasWdoCandle ? trendClass(wdoPrice.close, wdoPrice.open) : null;
+      const winTrend = hasWinCandle ? trendClass(winPrice.close, winPrice.open) : null;
+      const wdoHit = (wdoTrend && wdoTrend !== 'flat' && aggProb !== null) ? ((aggProb >= 50) === (wdoTrend === 'up')) : null;
+      const winHit = (winTrend && winTrend !== 'flat' && aggProbIbov !== null) ? ((aggProbIbov >= 50) === (winTrend === 'up')) : null;
+      const hits = [wdoHit, winHit].filter(h => h !== null);
+      let bannerClass = 'retro-pending';
+      if (hits.length) {
+        bannerClass = hits.every(h => h) ? 'retro-match' : hits.every(h => !h) ? 'retro-miss' : 'retro-mixed';
+      }
+
+      retroHtml = `<div class="retro-banner ${bannerClass}">
+        <div class="retro-layout">
+          <div class="retro-prices">
+            ${priceGridHtml('Mini Dólar (WDO)', wdoPrice)}
+            ${priceGridHtml('Mini Índice (WIN)', winPrice)}
+          </div>
+          <div class="result-panel">
+            <p class="result-panel-label">Resultado do dia</p>
+            ${resultBlock('Mini Dólar (WDO)', wdoPrice, aggProb)}
+            ${resultBlock('Mini Índice (WIN)', winPrice, aggProbIbov)}
+          </div>
+        </div>
+      </div>`;
     } else {
       const isFuture = dateStr > todayStrBR();
-      retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem candle do WDO pra essa data — cole o preço em "Atualizar Dados".'}</div>`;
+      retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem candle do WDO/WIN pra essa data — cole o preço em "Atualizar Dados".'}</div>`;
     }
     retroEl.innerHTML = retroHtml;
   } catch (err) {
@@ -750,6 +806,73 @@ function renderHolidayCalendar() {
   document.getElementById('calNext').addEventListener('click', () => { calState.setMonth(calState.getMonth() + 1); renderHolidayCalendar(); });
 }
 
+/* ---------------- PLACAR (acerto/erro histórico) ---------------- */
+// Lê accuracy_log, que é calculado sozinho pelo robô scripts/compute-accuracy.js
+// toda vez que o cálculo de probabilidade roda de novo — o site nunca recalcula
+// isso no navegador, só mostra o que já veio pronto do banco.
+async function loadPlacar() {
+  const summaryEl = document.getElementById('placarSummary');
+  const listEl = document.getElementById('placarList');
+  if (!summaryEl || !listEl) return;
+  summaryEl.innerHTML = '<p class="stats-empty">Carregando…</p>';
+  listEl.innerHTML = '';
+  try {
+    const { data, error } = await supabase
+      .from('accuracy_log')
+      .select('asset, price_date, predicted_pct_up, predicted_direction, actual_direction, hit')
+      .order('price_date', { ascending: false });
+    if (error) throw error;
+    const rows = data || [];
+
+    if (rows.length === 0) {
+      summaryEl.innerHTML = '<p class="stats-empty">Ainda não tem placar calculado. Ele é gerado automaticamente toda vez que você atualiza dados em "Atualizar Dados".</p>';
+      return;
+    }
+
+    function summaryFor(asset) {
+      const rs = rows.filter(r => r.asset === asset);
+      const hits = rs.filter(r => r.hit).length;
+      return { total: rs.length, hits, pct: rs.length ? Math.round((hits / rs.length) * 1000) / 10 : null };
+    }
+    const wdoSum = summaryFor('WDO');
+    const winSum = summaryFor('WIN');
+
+    function summaryBlock(label, s) {
+      if (!s.total) return `<div class="placar-block"><span class="placar-asset">${label}</span><span class="prob-empty">sem dado ainda</span></div>`;
+      return `
+        <div class="placar-block">
+          <span class="placar-asset">${label}</span>
+          <span class="placar-pct">${s.pct}%</span>
+          <span class="placar-meta">${s.hits} acerto(s) de ${s.total} dia(s) avaliado(s)</span>
+        </div>`;
+    }
+
+    summaryEl.innerHTML = `
+      <div class="placar-summary-blocks">
+        ${summaryBlock('Mini Dólar (WDO)', wdoSum)}
+        ${summaryBlock('Mini Índice (WIN)', winSum)}
+      </div>
+      <p class="placar-note">Compara a previsão que o Pulso mostrou naquele dia com o fechamento real. Só entram dias que têm candle E previsão calculada — dias sem dado suficiente ficam de fora da conta.</p>`;
+
+    listEl.innerHTML = rows.slice(0, 90).map(r => {
+      const dateLabel = fmtDate(r.price_date);
+      const dirLabel = r.actual_direction === 'up' ? 'Alta' : 'Baixa';
+      const predLabel = r.predicted_direction === 'up' ? 'Alta' : 'Baixa';
+      return `
+        <div class="placar-row ${r.hit ? 'placar-hit' : 'placar-miss'}">
+          <span class="placar-row-date">${dateLabel}</span>
+          <span class="placar-row-asset">${r.asset}</span>
+          <span class="placar-row-pred">Previu ${predLabel} ${r.predicted_pct_up}%</span>
+          <span class="placar-row-actual">Fechou em ${dirLabel}</span>
+          <span class="placar-row-badge">${r.hit ? '✅' : '❌'}</span>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    console.error(err);
+    summaryEl.innerHTML = '<p class="stats-empty">Não consegui carregar o placar agora.</p>';
+  }
+}
+
 /* ---------------- ATUALIZAR DADOS (colar manual) ---------------- */
 async function sendIngest(body, resultElId, btnEl) {
   const resultEl = document.getElementById(resultElId);
@@ -807,6 +930,7 @@ setInterval(loadOvernightNews, 5 * 60 * 1000); // atualiza sozinho a cada 5 min
 wireDailyDateNav();
 loadDailySummary(todayStrBR());
 renderHolidayCalendar();
+loadPlacar();
 document.getElementById('enablePushBtn').addEventListener('click', enablePush);
 checkPushStatus();
 wireIngestPanel();
