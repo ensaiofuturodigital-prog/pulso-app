@@ -512,10 +512,12 @@ async function loadDailySummary(dateStr) {
           const flag = countryFlag(ind.country);
           const time = ind.typical_time_brt ? ` · por volta das ${ind.typical_time_brt}` : '';
           const rel = releaseByIndicator[ind.id];
-          const fetchedDateBR = rel && rel.fetched_at
-            ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(rel.fetched_at))
-            : null;
-          const releasedToday = !!(fetchedDateBR && fetchedDateBR === dateStr);
+          // Corrigido em 08/08/2026: antes comparava a data em que o dado foi
+          // COLADO (fetched_at) com a data do Painel — isso quebrava qualquer
+          // indicador colado depois do dia real do lançamento (o normal no
+          // fluxo manual). Agora checa se existe valor real gravado pra essa
+          // data exata, não quando ele foi digitado no "Atualizar Dados".
+          const releasedToday = !!(rel && rel.release_date === dateStr && rel.actual_value !== null && rel.actual_value !== undefined);
           const trend = rel ? trendClass(rel.actual_value, rel.previous_value) : 'flat';
 
           if (s && (s.sample_size || 0) >= 5) {
