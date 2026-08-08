@@ -1,0 +1,26 @@
+name: Compute Accuracy
+
+# Roda sozinho depois que "Compute Indicator Stats" ou "Compute Baseline Stats"
+# terminam (que por sua vez são disparados pelo ingest sempre que você cola
+# dado novo em "Atualizar Dados") — assim o Placar sempre usa a probabilidade
+# mais recente. workflow_dispatch fica disponível também pra rodar na mão.
+on:
+  workflow_run:
+    workflows: ["Compute Indicator Stats", "Compute Baseline Stats"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: node scripts/compute-accuracy.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
