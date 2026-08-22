@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { parseCalendarText, parseNumericValue } from './lib/parseCalendar.js';
+import { parseCalendarTextInvesting, parseNumberPT, looksLikeInvestingCalendar } from './lib/parseCalendarInvesting.js';
 import { parsePriceText } from './lib/parsePrice.js';
 import { resolveCode } from './lib/indicatorMap.js';
 
@@ -92,8 +93,13 @@ export default async function handler(req, res) {
 }
 
 async function ingestCalendar(text) {
-  const events = parseCalendarText(text);
-  const summary = { total_eventos: events.length, mapeados: 0, sem_mapa: [], erros: [] };
+  // Detecta sozinho se você colou do Trading Economics (inglês) ou do
+  // Investing.com (português) — adicionado em 21/08/2026. Não precisa mais
+  // escolher: cola de qualquer um dos dois que funciona.
+  const fromInvesting = looksLikeInvestingCalendar(text);
+  const events = fromInvesting ? parseCalendarTextInvesting(text) : parseCalendarText(text);
+  const parseNumber = fromInvesting ? parseNumberPT : parseNumericValue;
+  const summary = { total_eventos: events.length, mapeados: 0, sem_mapa: [], erros: [], fonte: fromInvesting ? 'Investing.com' : 'Trading Economics' };
 
   // Descobre o código do indicador pra cada evento e agrupa
   const byCode = {};
@@ -137,8 +143,8 @@ async function ingestCalendar(text) {
       .map(e => ({
         indicator_id: indicatorId,
         release_date: e.date,
-        actual_value: parseNumericValue(e.actual),
-        previous_value: parseNumericValue(e.previous),
+        actual_value: parseNumber(e.actual),
+        previous_value: parseNumber(e.previous),
       }))
       .filter(r => r.actual_value !== null);
 
