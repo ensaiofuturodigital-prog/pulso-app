@@ -657,19 +657,19 @@ button, input, select {
 .placar-pct { display: block; font-family: var(--font-mono); font-size: 30px; font-weight: 700; color: var(--gold); }
 .placar-meta { font-size: 13.5px; color: var(--text-dim); }
 .placar-note { font-size: 12.5px; color: var(--text-faint); margin: 14px 0 0; font-style: italic; }
-.placar-list { display: flex; flex-direction: column; gap: 1px; }
-.placar-row {
+.price-grid-wrap { display: flex; flex-direction: column; gap: 20px; }
+.price-grid-block + .price-grid-block { padding-top: 16px; border-top: 1px dashed var(--border); }
+.close-row {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 10px 14px; border-radius: var(--radius-sm);
-  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 13.5px;
 }
-.placar-row + .placar-row { margin-top: 6px; }
-.placar-row.placar-hit { border-left: 3px solid var(--teal); }
-.placar-row.placar-miss { border-left: 3px solid var(--coral); }
-.placar-row-date { font-family: var(--font-mono); font-size: 13.5px; color: var(--text-dim); min-width: 60px; }
-.placar-row-asset { font-weight: 700; font-size: 13px; min-width: 36px; }
-.placar-row-pred, .placar-row-actual { font-size: 13.5px; color: var(--text-dim); }
-.placar-row-badge { margin-left: auto; font-size: 16px; }
+.close-row:last-child { border-bottom: none; }
+.close-row-date { color: var(--text-dim); min-width: 84px; font-weight: 600; }
+.close-row-item { color: var(--text-dim); }
+.close-row-final { color: var(--text); font-weight: 600; margin-left: auto; }
+.close-row.up .close-row-final { color: var(--teal); }
+.close-row.down .close-row-final { color: var(--coral); }
 
 /* ---------- SELO DE CONFIABILIDADE ---------- */
 .conf-badge {
