@@ -187,71 +187,43 @@ function sparklineSvg(points, trend) {
   return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${coords}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
-/* ---------------- INDICATORS PANEL ---------------- */
-/* ---------------- CALENDAR / TIMELINE PANEL ---------------- */
-async function loadTimeline() {
-  const list = document.getElementById('calendarList');
+/* ---------------- CALENDÁRIO: FECHAMENTOS RECENTES (WDO/WIN) ---------------- */
+// Trocado em 23/08/2026: antes essa aba mostrava a lista de indicadores
+// econômicos divulgados (igual ficava mais embaixo, meio repetido com outras
+// telas) — agora mostra os últimos fechamentos de WDO e WIN, do jeito que já
+// aparece no card de candle do Painel do dia.
+async function loadCalendarPrices() {
+  const el = document.getElementById('calendarPrices');
+  if (!el) return;
   try {
-    const { data: indicators } = await supabase.from('indicators').select('id,code,name_pt,country');
-    const { data: releases, error } = await supabase
-      .from('indicator_releases')
-      .select('*')
-      .order('release_date', { ascending: false })
-      .limit(80);
-    if (error) throw error;
+    const [wdoRes, winRes] = await Promise.all([
+      supabase.from('price_daily').select('price_date,open,high,low,close').eq('asset', 'WDO').order('price_date', { ascending: false }).limit(5),
+      supabase.from('price_daily').select('price_date,open,high,low,close').eq('asset', 'WIN').order('price_date', { ascending: false }).limit(5),
+    ]);
+    const wdoRows = wdoRes.data || [];
+    const winRows = winRes.data || [];
 
-    if (!releases || releases.length === 0) {
-      list.innerHTML = '<p class="empty-note">Nenhuma divulgação registrada ainda.</p>';
-      return;
+    function block(label, rows) {
+      if (!rows.length) return `<div class="price-grid-block"><p class="price-grid-label">${label} — sem dado ainda</p></div>`;
+      const rowsHtml = rows.map(r => {
+        const dateLabel = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(r.price_date + 'T12:00:00'));
+        const trend = trendClass(r.close, r.open);
+        return `
+          <div class="close-row ${trend}">
+            <span class="close-row-date">${dateLabel}</span>
+            <span class="close-row-item">Ab. R$ ${fmtNum(r.open)}</span>
+            <span class="close-row-item">Máx. R$ ${fmtNum(r.high)}</span>
+            <span class="close-row-item">Mín. R$ ${fmtNum(r.low)}</span>
+            <span class="close-row-item close-row-final">Fech. R$ ${fmtNum(r.close)}</span>
+          </div>`;
+      }).join('');
+      return `<div class="price-grid-block"><p class="price-grid-label">${label} — últimos fechamentos</p>${rowsHtml}</div>`;
     }
 
-    // Séries contínuas (ex: Selic, taxas do BCE) ficam disponíveis todo dia mesmo sem
-    // uma divulgação nova de verdade — só mostra quando o valor realmente mudou.
-    // Também tira o dólar/Ibovespa/tickers e séries sem evento de divulgação real
-    // (esses já aparecem no card de abertura/fechamento, não são "indicador econômico").
-    const NON_INDICATOR_CODES = ['BCB_USDBRL', 'IBOV', 'DTWEXBGS', 'DGS10', 'DCOILWTICO', 'DFF', 'ECBMRRFR', 'ECBDFR'];
-    const indMapPre = {};
-    (indicators || []).forEach(i => indMapPre[i.id] = i);
-    const changedReleases = releases.filter(rel => {
-      const code = indMapPre[rel.indicator_id]?.code;
-      if (code && NON_INDICATOR_CODES.includes(code)) return false;
-      return rel.previous_value === null || rel.actual_value !== rel.previous_value;
-    });
-
-    if (changedReleases.length === 0) {
-      list.innerHTML = '<p class="empty-note">Nenhuma divulgação registrada ainda.</p>';
-      return;
-    }
-
-    const indMap = {};
-    (indicators || []).forEach(i => indMap[i.id] = i);
-
-    let html = '';
-    let currentDay = '';
-    changedReleases.forEach(rel => {
-      const ind = indMap[rel.indicator_id] || {};
-      const dayKey = rel.release_date;
-      if (dayKey !== currentDay) {
-        const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(dayKey + 'T12:00:00'));
-        html += `<div class="tl-month">${weekday}</div>`;
-        currentDay = dayKey;
-      }
-      const trend = trendClass(rel.actual_value, rel.previous_value);
-      const flag = countryFlag(ind.country);
-      html += `
-        <div class="tl-row">
-          <span class="tl-date">${flag}</span>
-          <span class="tl-dot ${trend}"></span>
-          <div class="tl-body">
-            <div class="tl-name">${ind.name_pt || 'Indicador'}</div>
-            <div class="tl-vals">Atual: ${fmtNum(rel.actual_value)} <span style="opacity:.6">· Anterior: ${fmtNum(rel.previous_value)}</span></div>
-          </div>
-        </div>`;
-    });
-    list.innerHTML = html;
+    el.innerHTML = block('Mini Dólar (WDO)', wdoRows) + block('Mini Índice (WIN)', winRows);
   } catch (err) {
     console.error(err);
-    list.innerHTML = '<p class="empty-note">Não consegui carregar o histórico agora.</p>';
+    el.innerHTML = '<p class="empty-note">Não consegui carregar as cotações agora.</p>';
   }
 }
 
@@ -810,24 +782,32 @@ function renderHolidayCalendar() {
 // Lê accuracy_log, que é calculado sozinho pelo robô scripts/compute-accuracy.js
 // toda vez que o cálculo de probabilidade roda de novo — o site nunca recalcula
 // isso no navegador, só mostra o que já veio pronto do banco.
+// Simplificado em 23/08/2026: só o placar geral por ativo (sem lista dia a dia),
+// com o ano do primeiro dado de preço inserido pra cada ativo.
 async function loadPlacar() {
   const summaryEl = document.getElementById('placarSummary');
-  const listEl = document.getElementById('placarList');
-  if (!summaryEl || !listEl) return;
+  if (!summaryEl) return;
   summaryEl.innerHTML = '<p class="stats-empty">Carregando…</p>';
-  listEl.innerHTML = '';
   try {
-    const { data, error } = await supabase
-      .from('accuracy_log')
-      .select('asset, price_date, predicted_pct_up, predicted_direction, actual_direction, hit')
-      .order('price_date', { ascending: false });
-    if (error) throw error;
-    const rows = data || [];
+    const [accRes, wdoFirstRes, winFirstRes] = await Promise.all([
+      supabase.from('accuracy_log').select('asset, hit'),
+      supabase.from('price_daily').select('price_date').eq('asset', 'WDO').order('price_date', { ascending: true }).limit(1),
+      supabase.from('price_daily').select('price_date').eq('asset', 'WIN').order('price_date', { ascending: true }).limit(1),
+    ]);
+    if (accRes.error) throw accRes.error;
+    const rows = accRes.data || [];
 
     if (rows.length === 0) {
       summaryEl.innerHTML = '<p class="stats-empty">Ainda não tem placar calculado. Ele é gerado automaticamente toda vez que você atualiza dados em "Atualizar Dados".</p>';
       return;
     }
+
+    function firstYear(res) {
+      const row = res.data && res.data[0];
+      return row ? new Date(row.price_date + 'T12:00:00').getFullYear() : null;
+    }
+    const wdoYear = firstYear(wdoFirstRes);
+    const winYear = firstYear(winFirstRes);
 
     function summaryFor(asset) {
       const rs = rows.filter(r => r.asset === asset);
@@ -837,36 +817,23 @@ async function loadPlacar() {
     const wdoSum = summaryFor('WDO');
     const winSum = summaryFor('WIN');
 
-    function summaryBlock(label, s) {
+    function summaryBlock(label, s, year) {
       if (!s.total) return `<div class="placar-block"><span class="placar-asset">${label}</span><span class="prob-empty">sem dado ainda</span></div>`;
+      const desde = year ? ` · dados desde ${year}` : '';
       return `
         <div class="placar-block">
           <span class="placar-asset">${label}</span>
           <span class="placar-pct">${s.pct}%</span>
-          <span class="placar-meta">${s.hits} acerto(s) de ${s.total} dia(s) avaliado(s)</span>
+          <span class="placar-meta">${s.hits} acerto(s) de ${s.total} dia(s) avaliado(s)${desde}</span>
         </div>`;
     }
 
     summaryEl.innerHTML = `
       <div class="placar-summary-blocks">
-        ${summaryBlock('Mini Dólar (WDO)', wdoSum)}
-        ${summaryBlock('Mini Índice (WIN)', winSum)}
+        ${summaryBlock('Mini Dólar (WDO)', wdoSum, wdoYear)}
+        ${summaryBlock('Mini Índice (WIN)', winSum, winYear)}
       </div>
       <p class="placar-note">Compara a previsão que o Pulso mostrou naquele dia com o fechamento real. Só entram dias que têm candle E previsão calculada — dias sem dado suficiente ficam de fora da conta.</p>`;
-
-    listEl.innerHTML = rows.slice(0, 90).map(r => {
-      const dateLabel = fmtDate(r.price_date);
-      const dirLabel = r.actual_direction === 'up' ? 'Alta' : 'Baixa';
-      const predLabel = r.predicted_direction === 'up' ? 'Alta' : 'Baixa';
-      return `
-        <div class="placar-row ${r.hit ? 'placar-hit' : 'placar-miss'}">
-          <span class="placar-row-date">${dateLabel}</span>
-          <span class="placar-row-asset">${r.asset}</span>
-          <span class="placar-row-pred">Previu ${predLabel} ${r.predicted_pct_up}%</span>
-          <span class="placar-row-actual">Fechou em ${dirLabel}</span>
-          <span class="placar-row-badge">${r.hit ? '✅' : '❌'}</span>
-        </div>`;
-    }).join('');
   } catch (err) {
     console.error(err);
     summaryEl.innerHTML = '<p class="stats-empty">Não consegui carregar o placar agora.</p>';
@@ -924,7 +891,7 @@ function wireIngestPanel() {
 
 /* ---------------- INIT ---------------- */
 loadLastUpdate();
-loadTimeline();
+loadCalendarPrices();
 loadOvernightNews();
 setInterval(loadOvernightNews, 5 * 60 * 1000); // atualiza sozinho a cada 5 min
 wireDailyDateNav();
