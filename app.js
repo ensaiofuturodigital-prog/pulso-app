@@ -187,46 +187,6 @@ function sparklineSvg(points, trend) {
   return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${coords}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
-/* ---------------- CALENDÁRIO: FECHAMENTOS RECENTES (WDO/WIN) ---------------- */
-// Trocado em 23/08/2026: antes essa aba mostrava a lista de indicadores
-// econômicos divulgados (igual ficava mais embaixo, meio repetido com outras
-// telas) — agora mostra os últimos fechamentos de WDO e WIN, do jeito que já
-// aparece no card de candle do Painel do dia.
-async function loadCalendarPrices() {
-  const el = document.getElementById('calendarPrices');
-  if (!el) return;
-  try {
-    const [wdoRes, winRes] = await Promise.all([
-      supabase.from('price_daily').select('price_date,open,high,low,close').eq('asset', 'WDO').order('price_date', { ascending: false }).limit(5),
-      supabase.from('price_daily').select('price_date,open,high,low,close').eq('asset', 'WIN').order('price_date', { ascending: false }).limit(5),
-    ]);
-    const wdoRows = wdoRes.data || [];
-    const winRows = winRes.data || [];
-
-    function block(label, rows) {
-      if (!rows.length) return `<div class="price-grid-block"><p class="price-grid-label">${label} — sem dado ainda</p></div>`;
-      const rowsHtml = rows.map(r => {
-        const dateLabel = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(r.price_date + 'T12:00:00'));
-        const trend = trendClass(r.close, r.open);
-        return `
-          <div class="close-row ${trend}">
-            <span class="close-row-date">${dateLabel}</span>
-            <span class="close-row-item">Ab. R$ ${fmtNum(r.open)}</span>
-            <span class="close-row-item">Máx. R$ ${fmtNum(r.high)}</span>
-            <span class="close-row-item">Mín. R$ ${fmtNum(r.low)}</span>
-            <span class="close-row-item close-row-final">Fech. R$ ${fmtNum(r.close)}</span>
-          </div>`;
-      }).join('');
-      return `<div class="price-grid-block"><p class="price-grid-label">${label} — últimos fechamentos</p>${rowsHtml}</div>`;
-    }
-
-    el.innerHTML = block('Mini Dólar (WDO)', wdoRows) + block('Mini Índice (WIN)', winRows);
-  } catch (err) {
-    console.error(err);
-    el.innerHTML = '<p class="empty-note">Não consegui carregar as cotações agora.</p>';
-  }
-}
-
 /* ---------------- RADAR: NOTÍCIAS DE MERCADO (24H) ---------------- */
 const BREAKING_KEYWORDS = [
   // Geopolítica / desastre / violência
@@ -891,7 +851,6 @@ function wireIngestPanel() {
 
 /* ---------------- INIT ---------------- */
 loadLastUpdate();
-loadCalendarPrices();
 loadOvernightNews();
 setInterval(loadOvernightNews, 5 * 60 * 1000); // atualiza sozinho a cada 5 min
 wireDailyDateNav();
