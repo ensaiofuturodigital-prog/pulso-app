@@ -515,6 +515,32 @@ button, input, select {
   flex-wrap: wrap;
 }
 .cal-legend span { display: flex; align-items: center; gap: 6px; }
+.cal-holiday-notes {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cal-holiday-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.cal-holiday-note .cal-tag { margin-top: 2px; flex-shrink: 0; }
+.cal-holiday-note b { color: var(--text); }
+.cal-holiday-notes-empty {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  font-size: 13px;
+  color: var(--text-faint);
+  font-style: italic;
+}
 
 /* ---------- SPARKLINE ---------- */
 .sparkline {
