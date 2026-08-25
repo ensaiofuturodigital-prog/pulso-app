@@ -653,6 +653,35 @@ function usObservedDate(date) {
 }
 function dstr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
+// Por que cada feriado existe — usado no aviso abaixo do calendário.
+const HOLIDAY_INFO = {
+  // Brasil
+  'Confraternização Universal': 'celebra a virada do ano no calendário civil.',
+  'Carnaval (segunda)': 'festa popular que antecede a Quaresma cristã; a B3 fecha por tradição de mercado (não é feriado nacional oficial).',
+  'Carnaval (terça)': 'festa popular que antecede a Quaresma cristã; a B3 fecha por tradição de mercado (não é feriado nacional oficial).',
+  'Sexta-feira Santa': 'feriado religioso cristão que relembra a crucificação de Jesus Cristo.',
+  'Tiradentes': 'homenagem a Joaquim José da Silva Xavier, líder da Inconfidência Mineira, executado em 1792 por lutar pela independência do Brasil.',
+  'Dia do Trabalho': 'celebra os direitos e conquistas dos trabalhadores — data comemorada em vários países.',
+  'Corpus Christi': 'feriado religioso cristão que celebra a eucaristia, 60 dias depois da Páscoa.',
+  'Independência do Brasil': 'data em que Dom Pedro I declarou a independência do Brasil de Portugal, em 1822.',
+  'Nossa Sr.ª Aparecida': 'dia da padroeira do Brasil, feriado religioso católico.',
+  'Finados': 'dia de homenagear os mortos, tradição católica.',
+  'Proclamação da República': 'data em que o Brasil deixou de ser uma monarquia e virou república, em 1889.',
+  'Consciência Negra': 'homenageia Zumbi dos Palmares e a luta contra o racismo, celebrando a cultura afro-brasileira.',
+  'Natal': 'celebração cristã do nascimento de Jesus Cristo.',
+  // EUA
+  'Ano Novo': 'celebra a virada do ano no calendário civil.',
+  'Martin Luther King Jr.': 'homenageia o líder dos direitos civis Martin Luther King Jr., assassinado em 1968.',
+  "Presidents' Day": 'homenageia os presidentes dos EUA — originalmente o aniversário de George Washington.',
+  'Good Friday (mercado de ações)': 'sexta-feira santa: feriado religioso cristão que a bolsa de NY observa por tradição, embora não seja feriado federal oficial dos EUA.',
+  'Memorial Day': 'homenageia os militares americanos mortos em serviço.',
+  'Juneteenth': 'celebra o fim da escravidão nos EUA — marca o dia de 1865 em que os últimos escravizados, no Texas, souberam da liberdade.',
+  'Independence Day': 'celebra a assinatura da Declaração de Independência dos EUA, em 1776.',
+  'Labor Day': 'celebra os trabalhadores e o movimento trabalhista americano.',
+  'Thanksgiving': 'feriado de Ação de Graças — tradição de gratidão pela colheita.',
+  'Christmas': 'celebração cristã do nascimento de Jesus Cristo.',
+};
+
 function getHolidays(year) {
   const easter = easterDate(year);
   const goodFriday = addDays(easter, -2);
@@ -721,6 +750,26 @@ function renderHolidayCalendar() {
     cells += `<div class="${cls}"><span class="cal-day">${day}</span>${tag}</div>`;
   }
 
+  // Feriados do mês exibido, pra explicar o "porquê" embaixo do calendário
+  const monthHolidays = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = dstr(new Date(year, month, day));
+    const h = holidays[key];
+    if (!h) continue;
+    if (h.br) monthHolidays.push({ day, country: 'br', label: 'BR', name: h.br, info: HOLIDAY_INFO[h.br] });
+    if (h.us) monthHolidays.push({ day, country: 'us', label: 'US', name: h.us, info: HOLIDAY_INFO[h.us] });
+  }
+  monthHolidays.sort((a, b) => a.day - b.day);
+  const holidayNotesHtml = monthHolidays.length
+    ? `<div class="cal-holiday-notes">
+        ${monthHolidays.map(h => `
+          <div class="cal-holiday-note">
+            <span class="cal-tag ${h.country}">${h.label}</span>
+            <span><b>${String(h.day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')} — ${h.name}:</b> ${h.info || 'feriado que fecha o mercado.'}</span>
+          </div>`).join('')}
+      </div>`
+    : `<p class="cal-holiday-notes-empty">Nenhum feriado de Brasil ou EUA nesse mês.</p>`;
+
   el.innerHTML = `
     <div class="cal-header">
       <button class="cal-nav" id="calPrev">‹</button>
@@ -732,7 +781,8 @@ function renderHolidayCalendar() {
     <div class="cal-legend">
       <span><span class="cal-tag br">BR</span> B3 fechada</span>
       <span><span class="cal-tag us">US</span> bolsas dos EUA fechadas</span>
-    </div>`;
+    </div>
+    ${holidayNotesHtml}`;
 
   document.getElementById('calPrev').addEventListener('click', () => { calState.setMonth(calState.getMonth() - 1); renderHolidayCalendar(); });
   document.getElementById('calNext').addEventListener('click', () => { calState.setMonth(calState.getMonth() + 1); renderHolidayCalendar(); });
