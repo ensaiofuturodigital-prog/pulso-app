@@ -87,15 +87,21 @@ async function computeForAsset(asset, busyDates) {
 }
 
 async function saveResult(asset, result) {
-  // Limpa o que existia antes pra esse ativo (troca de método precisa apagar
-  // as linhas do método anterior, senão sobra lixo misturado)
-  await supabase.from('baseline_stats').delete().eq('asset', asset);
-
+  // Corrigido em 25/08/2026: antes apagava tudo desse ativo e SÓ DEPOIS
+  // inserdava de novo — isso deixava a tabela vazia por um instante entre
+  // as duas chamadas. Se o compute-accuracy.js rodasse bem nesse intervalo
+  // (o que aconteceu de verdade em 22/08/2026 às 14:47), ele lia a tabela
+  // vazia e contava como "sem baseline" um monte de dia que na verdade tem
+  // baseline sim — o placar saía errado (bem menor do que deveria) até a
+  // próxima rodada corrigir sozinha. Agora grava o dado novo PRIMEIRO
+  // (upsert, nunca fica vazio) e só depois apaga o que sobrou de um método
+  // antigo — nesse meio tempo a tabela sempre tem algum dado válido.
   if (result.winner === 'geral') {
-    const { error } = await supabase.from('baseline_stats').insert({
+    const { error } = await supabase.from('baseline_stats').upsert({
       asset, weekday: null, pct_up: result.pctGeral, sample_size: result.sampleGeral, method: 'geral',
-    });
+    }, { onConflict: 'asset,weekday' });
     if (error) throw error;
+    await supabase.from('baseline_stats').delete().eq('asset', asset).not('weekday', 'is', null);
     console.log(`✅ ${asset}: salvo método 'geral' (${result.pctGeral.toFixed(1)}% alta, ${result.sampleGeral} dias)`);
   } else {
     const rows = Object.keys(result.pctByWeekday)
@@ -104,8 +110,9 @@ async function saveResult(asset, result) {
         asset, weekday: parseInt(wd), pct_up: result.pctByWeekday[wd],
         sample_size: result.byWeekday[wd].total, method: 'dia_semana',
       }));
-    const { error } = await supabase.from('baseline_stats').insert(rows);
+    const { error } = await supabase.from('baseline_stats').upsert(rows, { onConflict: 'asset,weekday' });
     if (error) throw error;
+    await supabase.from('baseline_stats').delete().eq('asset', asset).is('weekday', null);
     console.log(`✅ ${asset}: salvo método 'dia_semana' (${rows.length} linhas)`);
   }
 }
