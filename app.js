@@ -799,13 +799,33 @@ async function loadPlacar() {
   if (!summaryEl) return;
   summaryEl.innerHTML = '<p class="stats-empty">Carregando…</p>';
   try {
-    const [accRes, wdoFirstRes, winFirstRes] = await Promise.all([
-      supabase.from('accuracy_log').select('asset, hit'),
+    // Corrigido em 25/08/2026: o Supabase só devolve até 1.000 linhas por
+    // consulta por padrão. accuracy_log já passou disso (mais de 7 mil
+    // linhas), e essa tela buscava tudo numa chamada só — ficava batendo
+    // nesse teto e mostrando só uma fatia aleatória dos dias, dando números
+    // errados e instáveis. Agora busca em blocos de 1.000 até trazer tudo.
+    async function fetchAllAccuracy() {
+      let all = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from('accuracy_log')
+          .select('asset, hit')
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        all = all.concat(data);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+      }
+      return all;
+    }
+
+    const [rows, wdoFirstRes, winFirstRes] = await Promise.all([
+      fetchAllAccuracy(),
       supabase.from('price_daily').select('price_date').eq('asset', 'WDO').order('price_date', { ascending: true }).limit(1),
       supabase.from('price_daily').select('price_date').eq('asset', 'WIN').order('price_date', { ascending: true }).limit(1),
     ]);
-    if (accRes.error) throw accRes.error;
-    const rows = accRes.data || [];
 
     if (rows.length === 0) {
       summaryEl.innerHTML = '<p class="stats-empty">Ainda não tem placar calculado. Ele é gerado automaticamente toda vez que você atualiza dados em "Atualizar Dados".</p>';
