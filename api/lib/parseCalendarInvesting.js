@@ -56,7 +56,13 @@ function parseDayHeaderPT(line) {
 // mensal vs anual são eventos diferentes), diferente do Trading Economics.
 function normalizeEventPT(name) {
   let out = name.trim();
+  // Bug corrigido em 27/08/2026: o Investing.com às vezes mostra o mês em
+  // português ("Ago", "Set") e às vezes em inglês ("Aug", "Sep") dependendo
+  // de qual parte do site você copia — antes só tirava o inglês, então um
+  // nome como "PMI Industrial (Ago)" nunca batia com o mapa de indicadores
+  // (o "(Ago)" ficava grudado e não existia entrada igual no dicionário).
   out = out.replace(/\s+\((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\)\s*$/i, '');
+  out = out.replace(/\s+\((Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)\)\s*$/i, '');
   out = out.replace(/\s+\(Q[1-4]\)\s*$/i, '');
   return out.replace(/\s{2,}/g, ' ').trim();
 }
