@@ -3,31 +3,47 @@
 // actual, previous, consensus, forecast } — mesmo formato de saída do leitor
 // do Trading Economics, pra não precisar mudar nada em ingest.js.
 //
-// Formato esperado (copiado e colado direto da tabela do site, com tabs):
-//   Tempo	Moe.	Imp.	Evento	Atual	Projeção	Anterior
+// O Investing.com copia em DOIS layouts diferentes dependendo de como o texto
+// é selecionado no navegador (varia por zoom, navegador, como você arrasta a
+// seleção) — o Pulso reconhece os dois automaticamente:
+//
+// Layout A — tudo numa linha só, separado por tab:
 //   Segunda, 17 de Agosto de 2026
 //   08:00	  BRL		IGP-10 - Índice de Inflação (Mensal) (Aug)	-0,5%	0,1%	-1,1%
-//   ...
+//
+// Layout B — cada campo numa linha:
+//   segunda-feira, 3 de agosto de 2026
+//   05:00
+//   EU
+//   PMI Industrial  (Jul)
+//   51,9	52,0	
+//   52,0
+//   (nessa segunda linha de valores, a única coisa é o "Anterior"; a linha
+//   de cima traz "Atual" e "Projeção" separados por tab)
+//
 // Números em formato brasileiro/europeu (ponto = milhar, vírgula = decimal),
 // igual ao "Dados Históricos" do Investing.com — reaproveita a mesma lógica
 // de parsePrice.js.
 
-const WEEKDAY_RE = /^(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo),\s*(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})\s*$/i;
-const TIME_RE = /^(\d{1,2}):(\d{2})$/;
+const WEEKDAY_RE = /^(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo)(-feira)?,\s*(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})\s*$/i;
+const TIME_ONLY_RE = /^(\d{1,2}):(\d{2})$/;
+const TIME_TAB_RE = /^(\d{1,2}):(\d{2})\t/;
 
 const MONTHS_PT = {
   janeiro: 0, fevereiro: 1, 'março': 2, marco: 2, abril: 3, maio: 4, junho: 5,
   julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11,
 };
 
-// Moeda (como aparece na coluna "Moe.") -> código de país usado no resto do
-// Pulso (mesma convenção do parseCalendar.js do Trading Economics).
+// Moeda (Layout A, coluna "Moe.") -> código de país usado no resto do Pulso.
 const CURRENCY_TO_COUNTRY = { USD: 'US', EUR: 'EA', BRL: 'BR' };
+// Layout B já vem com o código de país direto ("BR"/"US"/"EU") — só aceita
+// esses três, que são os que o Pulso rastreia.
+const VALID_COUNTRY_CODES = ['BR', 'US', 'EU', 'EA'];
 
 function parseDayHeaderPT(line) {
   const m = WEEKDAY_RE.exec(line.trim());
   if (!m) return null;
-  const [, , day, monthName, year] = m;
+  const [, , , day, monthName, year] = m;
   const month = MONTHS_PT[monthName.toLowerCase()];
   if (month === undefined) return null;
   const d = new Date(Date.UTC(parseInt(year), month, parseInt(day)));
@@ -63,53 +79,109 @@ export function parseNumberPT(raw) {
   return num * multiplier;
 }
 
+function normalizeCountry(raw) {
+  const c = (raw || '').trim().toUpperCase();
+  if (CURRENCY_TO_COUNTRY[c]) return CURRENCY_TO_COUNTRY[c]; // "USD"/"EUR"/"BRL"
+  if (VALID_COUNTRY_CODES.includes(c)) return c === 'EU' ? 'EA' : c; // já é "BR"/"US"/"EU"
+  return null;
+}
+
 export function parseCalendarTextInvesting(rawText) {
   const lines = rawText.split('\n').map(l => l.replace(/\r$/, ''));
   const events = [];
   let currentDate = null;
+  let i = 0;
 
-  for (const line of lines) {
+  while (i < lines.length) {
+    const line = lines[i];
+
     const dayDate = parseDayHeaderPT(line);
-    if (dayDate) { currentDate = dayDate; continue; }
-    if (!currentDate) continue; // ignora tudo antes do primeiro cabeçalho de dia (calendário mini, "Aplicar" etc)
+    if (dayDate) { currentDate = dayDate; i++; continue; }
+    if (!currentDate) { i++; continue; } // ignora tudo antes do primeiro cabeçalho de dia
 
-    if (!line.includes('\t')) continue;
-    const cols = line.split('\t');
-    const timeM = TIME_RE.exec(cols[0].trim());
-    if (!timeM) continue; // não é linha de evento (cabeçalho de coluna, legenda etc)
+    // --- Layout A: tudo numa linha só, separada por tab ---
+    if (TIME_TAB_RE.test(line)) {
+      const cols = line.split('\t');
+      const timeM = TIME_ONLY_RE.exec(cols[0].trim());
+      const country = normalizeCountry(cols[1]);
+      const eventName = normalizeEventPT((cols[3] || '').trim());
+      if (timeM && country && eventName) {
+        events.push({
+          date: currentDate,
+          time: `${cols[0].trim().padStart(5, '0')}:00`,
+          country,
+          event: eventName,
+          actual: (cols[4] || '').trim() || null,
+          previous: (cols[6] || '').trim() || null,
+          consensus: null,
+          forecast: (cols[5] || '').trim() || null,
+        });
+      }
+      i++;
+      continue;
+    }
 
-    const currency = (cols[1] || '').trim();
-    const country = CURRENCY_TO_COUNTRY[currency];
-    if (!country) continue; // moeda que o Pulso ainda não rastreia
+    // --- Layout B: cada campo numa linha (hora / país / evento / valores) ---
+    const timeM = TIME_ONLY_RE.exec(line.trim());
+    if (timeM) {
+      const country = normalizeCountry(lines[i + 1]);
+      const eventNameRaw = lines[i + 2];
+      if (!country || eventNameRaw === undefined) { i++; continue; }
+      const eventName = normalizeEventPT(eventNameRaw);
 
-    const eventNameRaw = (cols[3] || '').trim();
-    const eventName = normalizeEventPT(eventNameRaw);
-    if (!eventName) continue;
+      // Junta as linhas de valor seguintes (pula linhas em branco) até achar
+      // o próximo evento (hora), o próximo dia, ou o fim do texto.
+      let j = i + 3;
+      const valueLines = [];
+      while (j < lines.length && valueLines.length < 2) {
+        const l = lines[j];
+        if (l.trim() === '') { j++; continue; }
+        if (TIME_ONLY_RE.test(l.trim()) || TIME_TAB_RE.test(l) || parseDayHeaderPT(l)) break;
+        valueLines.push(l);
+        j++;
+      }
 
-    const actual = (cols[4] || '').trim() || null;
-    const forecast = (cols[5] || '').trim() || null; // "Projeção"
-    const previous = (cols[6] || '').trim() || null; // "Anterior"
+      let actual = null, forecast = null, previous = null;
+      if (valueLines.length === 1) {
+        if (valueLines[0].includes('\t')) {
+          const parts = valueLines[0].split('\t').map(s => s.trim()).filter(s => s !== '');
+          actual = parts[0] || null;
+          forecast = parts[1] || null;
+        } else {
+          actual = valueLines[0].trim() || null;
+        }
+      } else if (valueLines.length === 2) {
+        const parts = valueLines[0].split('\t').map(s => s.trim()).filter(s => s !== '');
+        actual = parts[0] || null;
+        forecast = parts[1] || null;
+        previous = valueLines[1].trim() || null;
+      }
 
-    let hh = parseInt(timeM[1]);
-    const time = `${String(hh).padStart(2, '0')}:${timeM[2]}:00`;
+      if (eventName) {
+        events.push({
+          date: currentDate,
+          time: `${line.trim().padStart(5, '0')}:00`,
+          country,
+          event: eventName,
+          actual,
+          previous,
+          consensus: null,
+          forecast,
+        });
+      }
+      i = j;
+      continue;
+    }
 
-    events.push({
-      date: currentDate,
-      time,
-      country,
-      event: eventName,
-      actual,
-      previous,
-      consensus: null, // Investing.com não separa consenso de projeção
-      forecast,
-    });
+    i++;
   }
 
   return events;
 }
 
 // Detecta se o texto colado é do Trading Economics (inglês) ou do Investing.com
-// (português) pra rotear pro parser certo automaticamente em ingest.js.
+// (português, em qualquer um dos dois layouts) pra rotear pro parser certo
+// automaticamente em ingest.js.
 export function looksLikeInvestingCalendar(rawText) {
-  return /^\s*Tempo\s*Atual\s*:/m.test(rawText) || /^(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo), \d{1,2} de \w+ de \d{4}/m.test(rawText);
+  return /^\s*Tempo\s*Atual\s*:/m.test(rawText) || rawText.split('\n').some(l => WEEKDAY_RE.test(l.trim()));
 }
