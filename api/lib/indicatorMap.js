@@ -51,6 +51,12 @@ export const EVENT_TO_CODE_PT = {
   'Núcleo de Preços PCE': 'PCEPILFE', // "Núcleo" = core; a versão "Índice de Preços PCE (Mensal)" sem núcleo NÃO é mapeada (não tem código dela ainda)
   'Pedidos de Bens Duravéis (Mensal)': 'DGORDER', // sic — assim mesmo, sem acento no "a", é como o Investing.com escreve
   'Pedidos de Bens Duráveis (Mensal)': 'DGORDER', // grafia correta, caso apareça assim em algum outro texto
+  // PMI — cadastrado em 27/08/2026. Brasil tem nome próprio (com "S&P
+  // Global"/"de do") que não colide com ninguém, então entra direto aqui.
+  // EUA e Zona do Euro usam o MESMO texto ("PMI Industrial" etc.), então
+  // esses dois ficam nos casos especiais por país lá embaixo.
+  'PMI Industrial S&P Global': 'SPGI_BR_MFG_PMI',
+  'PMI de do Setor de Serviços S&P Global': 'SPGI_BR_SVC_PMI', // sic — "de do" é como o Investing.com escreve (erro de digitação do próprio site)
 };
 
 // Casos especiais que dependem do país (mesmo nome de evento, indicador diferente)
@@ -69,5 +75,10 @@ export function resolveCode(eventName, country) {
   // a mesma frase aparece pra Zona do Euro com um indicador que o Pulso
   // ainda não rastreia separadamente.
   if (eventName === 'IPC-núcleo (Anual)' && country === 'US') return 'CPILFESL';
+  // PMI dos EUA e da Zona do Euro usam o mesmo texto no Investing.com —
+  // só o país muda qual PMI é de verdade.
+  if (eventName === 'PMI Industrial') return country === 'US' ? 'SPGI_US_MFG_PMI' : country === 'EA' ? 'SPGI_EU_MFG_PMI' : null;
+  if (eventName === 'PMI do Setor de Serviços') return country === 'US' ? 'SPGI_US_SVC_PMI' : country === 'EA' ? 'SPGI_EU_SVC_PMI' : null;
+  if (eventName === 'PMI Composto S&P Global') return country === 'US' ? 'SPGI_US_COMP_PMI' : country === 'EA' ? 'SPGI_EU_COMP_PMI' : country === 'BR' ? 'SPGI_BR_COMP_PMI' : null;
   return EVENT_TO_CODE[eventName] || EVENT_TO_CODE_PT[eventName] || null;
 }
