@@ -46,6 +46,11 @@ export const EVENT_TO_CODE_PT = {
   'Balanço Patrimonial do Federal Reserve': 'WALCL',
   'Saldos de reservas com bancos do Federal Reserve': 'WRESBAL',
   'IPC Zona do Euro (Anual)': 'CP0000EZ19M086NEST',
+  // Confirmados em 26/08/2026 contra um calendário real de agosto inteiro:
+  'Gastos Pessoais (Mensal)': 'PCE',
+  'Núcleo de Preços PCE': 'PCEPILFE', // "Núcleo" = core; a versão "Índice de Preços PCE (Mensal)" sem núcleo NÃO é mapeada (não tem código dela ainda)
+  'Pedidos de Bens Duravéis (Mensal)': 'DGORDER', // sic — assim mesmo, sem acento no "a", é como o Investing.com escreve
+  'Pedidos de Bens Duráveis (Mensal)': 'DGORDER', // grafia correta, caso apareça assim em algum outro texto
 };
 
 // Casos especiais que dependem do país (mesmo nome de evento, indicador diferente)
@@ -56,5 +61,13 @@ export function resolveCode(eventName, country) {
     if (country === 'US') return 'GDPC1';
     return null; // PIB da Zona do Euro ainda não é rastreado pelo Pulso
   }
+  // "Balança Comercial" sozinho (sem "de Bens") só é o Balance of Trade
+  // oficial dos EUA quando country === 'US' — a mesma frase aparece pra
+  // Zona do Euro com outro significado, que o Pulso ainda não rastreia.
+  if (eventName === 'Balança Comercial' && country === 'US') return 'BOPGSTB';
+  // "IPC-núcleo (Anual)" é Core CPI dos EUA só quando country === 'US' —
+  // a mesma frase aparece pra Zona do Euro com um indicador que o Pulso
+  // ainda não rastreia separadamente.
+  if (eventName === 'IPC-núcleo (Anual)' && country === 'US') return 'CPILFESL';
   return EVENT_TO_CODE[eventName] || EVENT_TO_CODE_PT[eventName] || null;
 }
