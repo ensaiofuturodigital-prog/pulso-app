@@ -151,7 +151,14 @@ function monthLabel(d) {
 }
 // BCB_USDBRL/IBOV são referências de mercado (não indicadores). DXY/Treasury/Petróleo
 // e CPI/HSP saíram do site a pedido. Usado pra filtrar qualquer lista de indicadores.
-const NON_DISPLAY_CODES = ['BCB_USDBRL', 'IBOV', 'DTWEXBGS', 'DGS10', 'DCOILWTICO', 'CPIAUCSL', 'HOUST', 'PERMIT'];
+// Corrigido em 04/09/2026: CPIAUCSL (CPI dos EUA), HOUST (Housing Starts) e
+// PERMIT (Building Permits) estavam aqui por engano — são indicadores reais
+// que você atualiza, nunca deveriam ficar escondidos do Painel. Os outros 5
+// códigos que estavam aqui (câmbio, Ibovespa, DXY, petróleo, Treasury 10
+// anos) eram sobra dos robôs automáticos antigos e foram apagados do banco
+// de vez — não existem mais, então nem precisam mais estar numa lista de
+// exclusão.
+const NON_DISPLAY_CODES = [];
 
 function todayStrBR() {
   // en-CA formata como YYYY-MM-DD, o mesmo formato usado no banco
