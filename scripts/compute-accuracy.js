@@ -13,7 +13,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Grava o resultado em accuracy_log (um registro por ativo por dia), pra o
 // site só ler pronto em vez de recalcular tudo no navegador toda vez.
 
-const NON_DISPLAY_CODES = ['BCB_USDBRL', 'IBOV', 'DTWEXBGS', 'DGS10', 'DCOILWTICO', 'CPIAUCSL', 'HOUST', 'PERMIT'];
+// Corrigido em 04/09/2026: mesma lista do app.js — CPIAUCSL/HOUST/PERMIT
+// nunca deveriam estar aqui (indicadores reais), e os outros 5 já foram
+// apagados do banco de vez (sobra de robôs antigos).
+const NON_DISPLAY_CODES = [];
 
 function trendClass(actual, previous) {
   if (previous === null || previous === undefined || actual === previous) return 'flat';
