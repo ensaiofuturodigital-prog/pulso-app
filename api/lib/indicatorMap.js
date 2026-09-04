@@ -27,6 +27,13 @@ export const EVENT_TO_CODE = {
   'EIA Crude Oil Stocks Change': 'WCESTUS1',
   'Fed Balance Sheet': 'WALCL',
   'Interest Rate Decision': 'BCB_SELIC', // só quando country === 'BR'
+  // PMI em inglês (Trading Economics) — adicionado em 04/09/2026 depois de
+  // ver um calendário real seu com esses nomes. ISM é um instituto diferente
+  // do S&P Global (número diferente de verdade, não pode virar o mesmo
+  // indicador) — só existe pros EUA, por isso fica direto aqui, sem precisar
+  // de caso especial por país.
+  'ISM Manufacturing PMI': 'ISM_US_MFG_PMI',
+  'ISM Services PMI': 'ISM_US_SVC_PMI',
 };
 
 // Mesma coisa, só que pros nomes em português como aparecem no calendário do
@@ -80,5 +87,12 @@ export function resolveCode(eventName, country) {
   if (eventName === 'PMI Industrial') return country === 'US' ? 'SPGI_US_MFG_PMI' : country === 'EA' ? 'SPGI_EU_MFG_PMI' : null;
   if (eventName === 'PMI do Setor de Serviços') return country === 'US' ? 'SPGI_US_SVC_PMI' : country === 'EA' ? 'SPGI_EU_SVC_PMI' : null;
   if (eventName === 'PMI Composto S&P Global') return country === 'US' ? 'SPGI_US_COMP_PMI' : country === 'EA' ? 'SPGI_EU_COMP_PMI' : country === 'BR' ? 'SPGI_BR_COMP_PMI' : null;
+  // Mesma coisa em inglês (Trading Economics) — "S&P Global ... PMI Flash"
+  // já vira "S&P Global ... PMI" depois do normalizeEvent tirar o "Flash",
+  // então trata igual à versão final/não-flash, de propósito (mesmo
+  // indicador, só estágio diferente da divulgação).
+  if (eventName === 'S&P Global Manufacturing PMI') return country === 'US' ? 'SPGI_US_MFG_PMI' : country === 'EA' ? 'SPGI_EU_MFG_PMI' : country === 'BR' ? 'SPGI_BR_MFG_PMI' : null;
+  if (eventName === 'S&P Global Services PMI') return country === 'US' ? 'SPGI_US_SVC_PMI' : country === 'EA' ? 'SPGI_EU_SVC_PMI' : country === 'BR' ? 'SPGI_BR_SVC_PMI' : null;
+  if (eventName === 'S&P Global Composite PMI') return country === 'US' ? 'SPGI_US_COMP_PMI' : country === 'EA' ? 'SPGI_EU_COMP_PMI' : country === 'BR' ? 'SPGI_BR_COMP_PMI' : null;
   return EVENT_TO_CODE[eventName] || EVENT_TO_CODE_PT[eventName] || null;
 }
