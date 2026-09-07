@@ -20,16 +20,8 @@ async function fetchAllRows(table, select, filters = (q) => q, orderCol = 'relea
   return all;
 }
  
-function findIndexOnOrBefore(sortedDates, targetDate) {
-  let lo = 0, hi = sortedDates.length - 1, ans = -1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (sortedDates[mid].date <= targetDate) { ans = mid; lo = mid + 1; }
-    else hi = mid - 1;
-  }
-  return ans;
-}
- 
+
+
 // Olha as variações (diferença entre divulgações consecutivas) e verifica se as
 // últimas 3 fugiram muito do padrão histórico (z-score > 2 em cima da linha de base).
 // ---------------------------------------------------------------------------
@@ -148,44 +140,42 @@ function detectStructuralBreak(actualValues) {
     : null;
 }
  
-function buildDirectionFn(series) {
-  return function (targetDate) {
-    const idx = findIndexOnOrBefore(series, targetDate);
-    if (idx <= 0) return null;
-    const today = series[idx].value;
-    const prev = series[idx - 1].value;
-    if (today > prev) return 'up';
-    if (today < prev) return 'down';
-    return 'flat';
-  };
-}
- 
 // ---------------------------------------------------------------------------
 // INTERVALO DE CONFIANÇA DE WILSON
 // Nota: o cálculo de intervalo/confiança agora é feito pelo motor avançado
 // (analiseCombinada), que já inclui Wilson ajustado + ponderação + Bayesiano.
 
-async function loadMarketSeries(code) {
-  const { data: ind, error } = await supabase.from('indicators').select('id').eq('code', code).single();
-  if (error || !ind) { console.log(`⚠️  Série de mercado ${code} não encontrada — rode o fetch correspondente primeiro.`); return null; }
-  const rows = await fetchAllRows('indicator_releases', 'release_date, actual_value', (q) => q.eq('indicator_id', ind.id));
-  const series = rows.map(r => ({ date: r.release_date, value: r.actual_value }));
-  console.log(`Série ${code} carregada: ${series.length} pontos (${series[0]?.date} a ${series[series.length - 1]?.date}).`);
-  return { id: ind.id, series };
+
+// Corrigido em 04/09/2026: antes usava BCB_USDBRL e IBOV (guardados como se
+// fossem "indicadores", com uma divulgação por dia) como referência de pra
+// onde o mercado foi. Esses dois foram apagados do banco (eram sobra dos
+// robôs automáticos antigos, sem uso real) — e nem deviam ser a referência
+// mesmo, já que o Pulso tem o preço REAL do WDO/WIN em price_daily desde
+// 31/07/2026. Agora usa direto o candle do dia (fechou > abriu = alta),
+// igual o resto do sistema (compute-baseline-stats.js, compute-accuracy.js)
+// já fazia.
+async function loadPriceDirections(asset) {
+  const rows = await fetchAllRows('price_daily', 'price_date, open, close', (q) => q.eq('asset', asset));
+  const map = {};
+  for (const r of rows) {
+    if (r.open === null || r.close === null) continue;
+    map[r.price_date] = r.close > r.open ? 'up' : r.close < r.open ? 'down' : 'flat';
+  }
+  console.log(`Preço ${asset} carregado: ${Object.keys(map).length} dias com candle.`);
+  return map;
 }
- 
+
 async function run() {
-  console.log('Calculando estatísticas de correlação com USD/BRL (WDO) e Ibovespa (WIN)...');
- 
-  const usd = await loadMarketSeries('BCB_USDBRL');
-  const ibov = await loadMarketSeries('IBOV');
-  if (!usd) throw new Error('Sem série do dólar — impossível continuar.');
- 
-  const usdDirectionOn = buildDirectionFn(usd.series);
-  const ibovDirectionOn = ibov ? buildDirectionFn(ibov.series) : () => null;
- 
-  const excludeCodes = ['BCB_USDBRL', 'IBOV'];
-  const { data: indicators } = await supabase.from('indicators').select('id, code').not('code', 'in', `(${excludeCodes.join(',')})`);
+  console.log('Calculando estatísticas de correlação com WDO e WIN...');
+
+  const wdoDirections = await loadPriceDirections('WDO');
+  const winDirections = await loadPriceDirections('WIN');
+  if (Object.keys(wdoDirections).length === 0) throw new Error('Sem candle de WDO em price_daily — impossível continuar.');
+
+  const usdDirectionOn = (date) => wdoDirections[date] || null;
+  const ibovDirectionOn = (date) => winDirections[date] || null;
+
+  const { data: indicators } = await supabase.from('indicators').select('id, code');
  
   for (const ind of indicators) {
     try {
