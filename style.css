@@ -641,18 +641,6 @@ button, input, select {
   font-size: 15.5px;
   color-scheme: dark;
 }
-.retro-banner {
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  font-size: 15px;
-  line-height: 1.5;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-}
-.retro-banner.retro-match { border-color: var(--teal); background: var(--teal-dim); color: var(--text); }
-.retro-banner.retro-miss { border-color: var(--coral); background: var(--coral-dim); color: var(--text); }
-.retro-banner.retro-mixed { border-color: var(--amber); background: rgba(242,184,75,0.1); color: var(--text); }
-.retro-banner.retro-pending { color: var(--text-dim); }
 .price-grid-label { font-size: 12px; color: var(--text-faint); margin: 0 0 8px; font-style: italic; }
 .price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
 .price-item { display: flex; flex-direction: column; gap: 2px; }
@@ -660,15 +648,26 @@ button, input, select {
 .price-value { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: var(--text); }
 .ci-range { font-size: 12px; color: var(--text-faint); font-weight: 400; margin-left: 2px; }
 
-/* Layout do card de candle + resultado do dia (08/08/2026) */
-.retro-layout { display: flex; gap: 24px; flex-wrap: wrap; align-items: stretch; }
-.retro-prices { flex: 1 1 300px; display: flex; flex-direction: column; gap: 14px; }
-.retro-prices .price-grid-label:not(:first-child) { margin-top: 2px; padding-top: 12px; border-top: 1px dashed var(--border); }
-.result-panel { flex: 1 1 260px; border-left: 1px dashed var(--border); padding-left: 20px; }
+/* Layout do card de candle + resultado do dia (08/08/2026), reestruturado em
+   12/09/2026: cada ativo (WDO/WIN) ganhou seu próprio card colorido pelo
+   próprio resultado, em vez de uma caixa única com cor "média" dos dois. */
+.retro-layout { display: flex; gap: 16px; flex-wrap: wrap; align-items: stretch; }
+.retro-asset-card {
+  flex: 1 1 300px;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+}
+.retro-asset-card.retro-asset-hit { border-color: var(--teal); background: var(--teal-dim); color: var(--text); }
+.retro-asset-card.retro-asset-miss { border-color: var(--coral); background: var(--coral-dim); color: var(--text); }
+.retro-asset-card.retro-asset-pending { color: var(--text-dim); }
+.retro-asset-card .result-panel { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
 .result-panel-label { font-size: 12px; color: var(--text-faint); margin: 0 0 10px; font-style: italic; }
 .result-item { display: flex; flex-direction: column; gap: 3px; padding: 8px 0; }
 .result-item + .result-item { border-top: 1px dashed var(--border); }
-.result-asset { font-size: 13.5px; font-weight: 600; color: var(--text-dim); }
 .result-badge { font-size: 15.5px; font-weight: 700; }
 .result-hit .result-badge { color: var(--teal); }
 .result-miss .result-badge { color: var(--coral); }
@@ -744,3 +743,4 @@ button, input, select {
   line-height: 1.5;
   max-width: 680px;
 }
+
