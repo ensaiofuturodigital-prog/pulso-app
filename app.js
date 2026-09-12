@@ -550,59 +550,64 @@ async function loadDailySummary(dateStr) {
         </div>`;
     }
 
-    function resultBlock(label, price, prob) {
+    // resultBlock: monta só o veredito (acertou/errou/sem dado), sem repetir
+    // o nome do ativo — o card em volta (assetCardHtml) já mostra o nome.
+    function resultBlock(price, prob) {
       if (!price || price.open == null) {
-        return `<div class="result-item result-empty"><span class="result-asset">${label}</span><span class="result-msg">Sem candle pra essa data.</span></div>`;
+        return { html: `<div class="result-item result-empty"><span class="result-msg">Sem candle pra essa data.</span></div>`, hit: null };
       }
       const actualTrend = trendClass(price.close, price.open);
       if (actualTrend === 'flat') {
-        return `<div class="result-item result-empty"><span class="result-asset">${label}</span><span class="result-msg">Fechou igual à abertura — sem direção clara pra avaliar.</span></div>`;
+        return { html: `<div class="result-item result-empty"><span class="result-msg">Fechou igual à abertura — sem direção clara pra avaliar.</span></div>`, hit: null };
       }
       const actualUp = actualTrend === 'up';
       if (prob === null || prob === undefined) {
-        return `<div class="result-item result-empty"><span class="result-asset">${label}</span><span class="result-msg">Fechou em ${actualUp ? 'Alta' : 'Baixa'}, mas não tinha previsão calculada pra esse dia.</span></div>`;
+        return { html: `<div class="result-item result-empty"><span class="result-msg">Fechou em ${actualUp ? 'Alta' : 'Baixa'}, mas não tinha previsão calculada pra esse dia.</span></div>`, hit: null };
       }
       const predictedUp = prob >= 50;
       const hit = predictedUp === actualUp;
       const pctShown = predictedUp ? prob : Math.round((100 - prob) * 10) / 10;
-      return `
-        <div class="result-item ${hit ? 'result-hit' : 'result-miss'}">
-          <span class="result-asset">${label}</span>
-          <span class="result-badge">${hit ? '✅ Acertou' : '❌ Errou'}</span>
-          <span class="result-detail">Previsão: ${predictedUp ? 'Alta' : 'Baixa'} ${pctShown}% · Fechou em ${actualUp ? 'Alta' : 'Baixa'}</span>
-        </div>`;
+      return {
+        html: `
+          <div class="result-item ${hit ? 'result-hit' : 'result-miss'}">
+            <span class="result-badge">${hit ? '✅ Acertou' : '❌ Errou'}</span>
+            <span class="result-detail">Previsão: ${predictedUp ? 'Alta' : 'Baixa'} ${pctShown}% · Fechou em ${actualUp ? 'Alta' : 'Baixa'}</span>
+          </div>`,
+        hit
+      };
+    }
+
+    // assetCardHtml: um card independente por ativo (WDO ou WIN), com borda
+    // e fundo coloridos só pelo resultado DAQUELE ativo — antes os dois
+    // ficavam numa caixa só, com uma cor "média" (verde/vermelho/âmbar)
+    // quando os dois resultados divergiam. Reestruturado em 12/09/2026 a
+    // pedido do PAULÃO.
+    function assetCardHtml(label, price, prob) {
+      if (!price || price.open == null) {
+        return `<div class="retro-asset-card retro-asset-pending">${priceGridHtml(label, price)}</div>`;
+      }
+      const { html: resultHtml, hit } = resultBlock(price, prob);
+      const stateClass = hit === true ? 'retro-asset-hit' : hit === false ? 'retro-asset-miss' : 'retro-asset-pending';
+      return `<div class="retro-asset-card ${stateClass}">
+        ${priceGridHtml(label, price)}
+        <div class="result-panel">
+          <p class="result-panel-label">Resultado do dia</p>
+          ${resultHtml}
+        </div>
+      </div>`;
     }
 
     let retroHtml = '';
     const hasWdoCandle = wdoPrice && wdoPrice.open != null;
     const hasWinCandle = winPrice && winPrice.open != null;
     if (hasWdoCandle || hasWinCandle) {
-      const wdoTrend = hasWdoCandle ? trendClass(wdoPrice.close, wdoPrice.open) : null;
-      const winTrend = hasWinCandle ? trendClass(winPrice.close, winPrice.open) : null;
-      const wdoHit = (wdoTrend && wdoTrend !== 'flat' && aggProb !== null) ? ((aggProb >= 50) === (wdoTrend === 'up')) : null;
-      const winHit = (winTrend && winTrend !== 'flat' && aggProbIbov !== null) ? ((aggProbIbov >= 50) === (winTrend === 'up')) : null;
-      const hits = [wdoHit, winHit].filter(h => h !== null);
-      let bannerClass = 'retro-pending';
-      if (hits.length) {
-        bannerClass = hits.every(h => h) ? 'retro-match' : hits.every(h => !h) ? 'retro-miss' : 'retro-mixed';
-      }
-
-      retroHtml = `<div class="retro-banner ${bannerClass}">
-        <div class="retro-layout">
-          <div class="retro-prices">
-            ${priceGridHtml('Mini Dólar (WDO)', wdoPrice)}
-            ${priceGridHtml('Mini Índice (WIN)', winPrice)}
-          </div>
-          <div class="result-panel">
-            <p class="result-panel-label">Resultado do dia</p>
-            ${resultBlock('Mini Dólar (WDO)', wdoPrice, aggProb)}
-            ${resultBlock('Mini Índice (WIN)', winPrice, aggProbIbov)}
-          </div>
-        </div>
+      retroHtml = `<div class="retro-layout">
+        ${assetCardHtml('Mini Dólar (WDO)', wdoPrice, aggProb)}
+        ${assetCardHtml('Mini Índice (WIN)', winPrice, aggProbIbov)}
       </div>`;
     } else {
       const isFuture = dateStr > todayStrBR();
-      retroHtml = `<div class="retro-banner retro-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem candle do WDO/WIN pra essa data — cole o preço em "Atualizar Dados".'}</div>`;
+      retroHtml = `<div class="retro-asset-card retro-asset-pending">${isFuture ? 'Esse dia ainda não aconteceu.' : 'Sem candle do WDO/WIN pra essa data — cole o preço em "Atualizar Dados".'}</div>`;
     }
     retroEl.innerHTML = retroHtml;
   } catch (err) {
@@ -944,3 +949,4 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch((err) => console.error('SW falhou:', err));
   });
 }
+
