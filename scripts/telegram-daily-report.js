@@ -26,6 +26,53 @@ function trendClass(actual, previous) {
   return actual > previous ? 'up' : 'down';
 }
 
+// --- Feriados nacionais do Brasil (mesma lógica do calendário no app.js) ---
+// Datas móveis (Carnaval, Corpus Christi) calculadas a partir da Páscoa.
+function easterDate(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function dstr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+
+function isBrHoliday(dateStr) {
+  const year = parseInt(dateStr.slice(0, 4), 10);
+  const easter = easterDate(year);
+  const goodFriday = addDays(easter, -2);
+  const carnavalMon = addDays(easter, -48);
+  const carnavalTue = addDays(easter, -47);
+  const corpusChristi = addDays(easter, 60);
+  const brHolidays = [
+    new Date(year, 0, 1),   // Confraternização Universal
+    carnavalMon,
+    carnavalTue,
+    goodFriday,
+    new Date(year, 3, 21),  // Tiradentes
+    new Date(year, 4, 1),   // Dia do Trabalho
+    corpusChristi,
+    new Date(year, 8, 7),   // Independência do Brasil
+    new Date(year, 9, 12),  // Nossa Sr.ª Aparecida
+    new Date(year, 10, 2),  // Finados
+    new Date(year, 10, 15), // Proclamação da República
+    new Date(year, 10, 20), // Consciência Negra
+    new Date(year, 11, 25), // Natal
+  ];
+  return brHolidays.some(h => dstr(h) === dateStr);
+}
+
+// Fim de semana ou feriado nacional = B3 fechada, sem dado econômico novo pra divulgar.
+function isNonTradingDay(dateStr) {
+  const weekday = new Date(dateStr + 'T12:00:00Z').getUTCDay(); // 0=domingo, 6=sábado
+  if (weekday === 0 || weekday === 6) return true;
+  return isBrHoliday(dateStr);
+}
+
 async function applyBaseline(dateStr) {
   const weekday = new Date(dateStr + 'T12:00:00Z').getUTCDay();
   const { data: baseRows } = await supabase.from('baseline_stats').select('*').in('asset', ['WDO', 'WIN']);
@@ -139,6 +186,11 @@ async function sendTelegram(text) {
 }
 
 async function run() {
+  const dateStr = todayStrBRT();
+  if (isNonTradingDay(dateStr)) {
+    console.log(`${dateStr} é fim de semana ou feriado — sem dado econômico novo, não envia probabilidades hoje.`);
+    return;
+  }
   const msg = await buildReport();
   await sendTelegram(msg);
 }
