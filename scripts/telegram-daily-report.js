@@ -187,10 +187,12 @@ async function sendTelegram(text) {
 
 async function run() {
   const dateStr = todayStrBRT();
-  if (isNonTradingDay(dateStr)) {
+  const forced = process.env.FORCE_SEND === 'true';
+  if (!forced && isNonTradingDay(dateStr)) {
     console.log(`${dateStr} é fim de semana ou feriado — sem dado econômico novo, não envia probabilidades hoje.`);
     return;
   }
+  if (forced) console.log('⚠️ Envio forçado (teste manual) — ignorando checagem de fim de semana/feriado.');
   const msg = await buildReport();
   await sendTelegram(msg);
 }
