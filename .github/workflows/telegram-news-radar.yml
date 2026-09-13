@@ -2,7 +2,7 @@ name: Telegram News Radar
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # a cada 6 horas (00h, 06h, 12h, 18h UTC)
+    - cron: '0 */4 * * *'  # a cada 4 horas (00h, 04h, 08h, 12h, 16h, 20h UTC)
   workflow_dispatch:
 
 jobs:
