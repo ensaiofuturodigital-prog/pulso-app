@@ -164,11 +164,9 @@ async function buildReport() {
     }
   }
 
-  const dateLabel = fmtDateLabel(dateStr);
-  let msg = `📊 *Probabilidades de hoje*\n${dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}\n\n`;
-
-  msg += `*WDO:* ${aggProb != null ? aggProb + '% de chance de alta' : 'sem dado suficiente ainda'} ${weightTotal ? `(${weightTotal} casos)` : ''}\n`;
-  msg += `*WIN:* ${aggProbIbov != null ? aggProbIbov + '% de chance de alta' : 'sem dado suficiente ainda'} ${weightTotalIbov ? `(${weightTotalIbov} casos)` : ''}\n`;
+  let msg = `MINI-DÓLAR (WDO) = ${aggProb != null ? aggProb + '% DE CHANCE DE ALTA' : 'SEM DADO SUFICIENTE'}\n`;
+  msg += `MINI-ÍNDICE (WIN) = ${aggProbIbov != null ? aggProbIbov + '% DE CHANCE DE ALTA' : 'SEM DADO SUFICIENTE'}\n\n`;
+  msg += `"ISSO NÃO É RECOMENDAÇÃO DE OPERAÇÃO, SÃO PROBABILIDADES HISTÓRICAS DE CADA ATIVO"`;
 
   return msg;
 }
