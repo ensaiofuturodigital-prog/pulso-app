@@ -2,25 +2,61 @@ name: Telegram News Radar
 
 on:
   schedule:
-    - cron: '17 3 * * *'   # 00h17 Brasília
-    - cron: '17 7 * * *'   # 04h17 Brasília
-    - cron: '17 10 * * *'  # 07h17 Brasília
-    - cron: '17 14 * * *'  # 11h17 Brasília
-    - cron: '17 18 * * *'  # 15h17 Brasília
-    - cron: '17 21 * * *'  # 18h17 Brasília
-    - cron: '17 1 * * *'   # 22h17 Brasília (madrugada seguinte em UTC)
+    - cron: '*/15 * * * *'  # roda de 15 em 15 min o dia todo; só age quando está num dos horários alvo
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Forçar envio agora, ignorando horários e checagem de duplicidade (só teste)'
+        required: false
+        default: 'false'
 
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verifica se é hora de mandar e se já foi enviado
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FORCE="${{ github.event.inputs.force }}"
+          if [ "$FORCE" = "true" ]; then
+            echo "should_send=true" >> "$GITHUB_OUTPUT"
+            echo "Envio forçado manualmente (teste)."
+            exit 0
+          fi
+          NOW=$(TZ='America/Sao_Paulo' date +%H:%M)
+          DUE="false"
+          for T in 00:17 04:17 07:17 11:17 15:17 18:17 22:17; do
+            DIFF=$(python3 -c "from datetime import datetime; now=datetime.strptime('$NOW','%H:%M'); t=datetime.strptime('$T','%H:%M'); diff=(now-t).total_seconds()/60; diff=diff+1440 if diff<0 else diff; print(int(diff))")
+            if [ "$DIFF" -ge 0 ] && [ "$DIFF" -lt 40 ]; then
+              DUE="true"
+            fi
+          done
+          if [ "$DUE" = "false" ]; then
+            echo "should_send=false" >> "$GITHUB_OUTPUT"
+            echo "Agora são $NOW (Brasília) — não é hora de nenhum dos 7 horários fixos, nada a fazer."
+            exit 0
+          fi
+          RESP=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/workflows/telegram-news-radar.yml/runs?status=success&per_page=10")
+          ALREADY=$(echo "$RESP" | python3 -c "import json,sys,datetime; d=json.load(sys.stdin); current_run_id=${{ github.run_id }}; now=datetime.datetime.utcnow(); found=any(r['id']!=current_run_id and (now - datetime.datetime.strptime(r['created_at'], '%Y-%m-%dT%H:%M:%SZ')).total_seconds() < 3000 for r in d.get('workflow_runs', [])); print('true' if found else 'false')")
+          if [ "$ALREADY" = "true" ]; then
+            echo "should_send=false" >> "$GITHUB_OUTPUT"
+            echo "Já teve um envio com sucesso nos últimos 50 minutos para este horário — pulando, sem duplicar."
+          else
+            echo "should_send=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.should_send == 'true'
         with:
           node-version: '22'
       - run: npm install
+        if: steps.check.outputs.should_send == 'true'
       - run: node scripts/telegram-news-radar.js
+        if: steps.check.outputs.should_send == 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
