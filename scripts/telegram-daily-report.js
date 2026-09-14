@@ -167,7 +167,7 @@ async function buildReport() {
   const weekdaysPt = ['DOMINGO', 'SEGUNDA FEIRA', 'TERÇA FEIRA', 'QUARTA FEIRA', 'QUINTA FEIRA', 'SEXTA FEIRA', 'SÁBADO'];
   const monthsPt = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
   const dObj = new Date(dateStr + 'T12:00:00Z');
-  const headerLine = `PROBABILIDADES PARA DAY TRADE NOS ATIVOS HOJE: ${weekdaysPt[dObj.getUTCDay()]} ${dObj.getUTCDate()} DE ${monthsPt[dObj.getUTCMonth()]} DE ${dObj.getUTCFullYear()}`;
+  const headerLine = `📊 PROBABILIDADES PARA DAY TRADE NOS ATIVOS HOJE: ${weekdaysPt[dObj.getUTCDay()]} ${dObj.getUTCDate()} DE ${monthsPt[dObj.getUTCMonth()]} DE ${dObj.getUTCFullYear()}`;
 
   let msg = `${headerLine}\n\n`;
   msg += `MINI-DÓLAR (WDO) = ${aggProb != null ? aggProb + '% DE CHANCE DE ALTA' : 'SEM DADO SUFICIENTE'}\n`;
