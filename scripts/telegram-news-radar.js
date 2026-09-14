@@ -13,8 +13,8 @@ function countryFlag(tag) {
 }
 
 async function buildDigest() {
-  // Janela de 5h: cobre com folga o maior intervalo entre os horários fixos de disparo.
-  const cutoff = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
+  // Janela de 7h: cobre com folga o maior intervalo entre os horários fixos de disparo.
+  const cutoff = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('news')
     .select('*')
@@ -25,13 +25,20 @@ async function buildDigest() {
 
   if (!data || data.length === 0) return null;
 
-  let msg = `📰 *Radar de Notícias*\n\n`;
+  let msg = `📰 *Radar de Notícias*
+
+`;
   msg += data.slice(0, 15).map(n => {
     const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date(n.published_at));
-    return `${countryFlag(n.country_tag)} ${time} — ${n.title}\n[Ler mais](${n.url})`;
-  }).join('\n\n');
+    return `${countryFlag(n.country_tag)} ${time} — ${n.title}
+[Ler mais](${n.url})`;
+  }).join('
 
-  if (data.length > 15) msg += `\n\n_+ ${data.length - 15} outras manchetes no site._`;
+');
+
+  if (data.length > 15) msg += `
+
+_+ ${data.length - 15} outras manchetes no site._`;
 
   return msg;
 }
@@ -55,3 +62,4 @@ async function run() {
 }
 
 run().catch(err => { console.error('❌ Falha:', err.message); process.exitCode = 1; });
+
