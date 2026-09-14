@@ -2,7 +2,7 @@ name: Telegram Daily Report
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # todo dia às 09h00 UTC (06h00 Brasília)
+    - cron: '7 9 * * *'  # todo dia às 09h07 UTC (06h07 Brasília) — fora da hora cheia pra evitar atraso/perda do agendamento
   workflow_dispatch:
     inputs:
       force:
