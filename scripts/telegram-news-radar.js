@@ -50,7 +50,7 @@ async function sendTelegram(text) {
 
 async function run() {
   const msg = await buildDigest();
-  if (!msg) { console.log('Nenhuma notícia nova nas últimas 6h — nada pra enviar.'); return; }
+  if (!msg) { console.log('Nenhuma notícia nova — nada pra enviar.'); return; }
   await sendTelegram(msg);
 }
 
