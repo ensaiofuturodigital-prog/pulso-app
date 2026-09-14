@@ -172,7 +172,7 @@ async function buildReport() {
   let msg = `${headerLine}\n\n`;
   msg += `MINI-DÓLAR (WDO) = ${aggProb != null ? aggProb + '% DE CHANCE DE ALTA' : 'SEM DADO SUFICIENTE'}\n`;
   msg += `MINI-ÍNDICE (WIN) = ${aggProbIbov != null ? aggProbIbov + '% DE CHANCE DE ALTA' : 'SEM DADO SUFICIENTE'}\n\n`;
-  msg += `"ISSO NÃO É RECOMENDAÇÃO DE OPERAÇÃO, SÃO PROBABILIDADES HISTÓRICAS DE CADA ATIVO"`;
+  msg += `"NÃO É RECOMENDAÇÃO DE OPERAÇÃO"`;
 
   return msg;
 }
