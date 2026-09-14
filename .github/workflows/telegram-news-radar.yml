@@ -2,7 +2,13 @@ name: Telegram News Radar
 
 on:
   schedule:
-    - cron: '13 */4 * * *'  # a cada 4h, 13 min depois da hora cheia — mesmo motivo
+    - cron: '17 3 * * *'   # 00h17 Brasília
+    - cron: '17 7 * * *'   # 04h17 Brasília
+    - cron: '17 10 * * *'  # 07h17 Brasília
+    - cron: '17 14 * * *'  # 11h17 Brasília
+    - cron: '17 18 * * *'  # 15h17 Brasília
+    - cron: '17 21 * * *'  # 18h17 Brasília
+    - cron: '17 1 * * *'   # 22h17 Brasília (madrugada seguinte em UTC)
   workflow_dispatch:
 
 jobs:
