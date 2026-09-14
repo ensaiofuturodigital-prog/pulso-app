@@ -13,8 +13,8 @@ function countryFlag(tag) {
 }
 
 async function buildDigest() {
-  // Pega as manchetes do radar das últimas 4h (mesma janela do robô).
-  const cutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+  // Janela de 5h: cobre com folga o maior intervalo entre os horários fixos de disparo.
+  const cutoff = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('news')
     .select('*')
@@ -25,7 +25,7 @@ async function buildDigest() {
 
   if (!data || data.length === 0) return null;
 
-  let msg = `📰 *Radar de Notícias*\nÚltimas 4 horas\n\n`;
+  let msg = `📰 *Radar de Notícias*\n\n`;
   msg += data.slice(0, 15).map(n => {
     const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date(n.published_at));
     return `${countryFlag(n.country_tag)} ${time} — ${n.title}\n[Ler mais](${n.url})`;
