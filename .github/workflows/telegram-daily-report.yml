@@ -2,8 +2,8 @@ name: Telegram Daily Report
 
 on:
   schedule:
-    - cron: '7 9 * * *'    # horário principal: 09h07 UTC (06h07 Brasília)
-    - cron: '37 9 * * *'   # horário de backup: 09h37 UTC (06h37 Brasília) — só age se o principal falhar/atrasar
+    - cron: '37 8 * * *'    # horário principal: 08h37 UTC (05h37 Brasília)
+    - cron: '7 9 * * *'     # horário de backup: 09h07 UTC (06h07 Brasília) — só age se o principal falhar/atrasar
   workflow_dispatch:
     inputs:
       force:
