@@ -9,11 +9,40 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function countryFlag(tag) {
-  return tag === 'BR' ? '🇧🇷' : tag === 'US' ? '🇺🇸' : tag === 'EA' ? '🇪🇺' : tag === 'CN' ? '🇨🇳' : tag === 'JP' ? '🇯🇵' : '🌐';
+  const flags = { BR: '🇧🇷', US: '🇺🇸', EA: '🇪🇺', CN: '🇨🇳', JP: '🇯🇵', GLOBAL: '🌐' };
+  return flags[tag] || '🌐';
+}
+
+function categoryBadge(cat) {
+  const badges = {
+    'JUROS/BC':   '🏦',
+    'COMMODITIES':'🛢️',
+    'BOLSA':      '📈',
+    'CÂMBIO':     '💱',
+    'MACRO':      '📊',
+    'FISCAL':     '📋',
+    'M&A/CORP':   '🤝',
+    'POLÍTICA':   '🏛️',
+    'GLOBAL':     '🌐',
+    'FINANÇAS':   '💰',
+    'ECONOMIA':   '📉',
+  };
+  return badges[cat] || '📰';
+}
+
+// Agrupa notícias por categoria para o digest
+function groupByCategory(items) {
+  const groups = {};
+  for (const n of items) {
+    const cat = n.impact_tag || 'ECONOMIA';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(n);
+  }
+  return groups;
 }
 
 async function buildDigest() {
-  // Janela de 7h: cobre com folga o maior intervalo entre os horários fixos de disparo.
+  // Janela de 7h: cobre com folga o maior intervalo entre os horários fixos
   const cutoff = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('news')
@@ -22,37 +51,76 @@ async function buildDigest() {
     .gte('published_at', cutoff)
     .order('published_at', { ascending: false });
   if (error) throw error;
-
   if (!data || data.length === 0) return null;
 
-  let msg = `📰 *Radar de Notícias*
+  const now = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+  }).format(new Date());
 
-`;
-  msg += data.slice(0, 15).map(n => {
-    const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date(n.published_at));
-    return `${countryFlag(n.country_tag)} ${time} — ${n.title}
-[Ler mais](${n.url})`;
-  }).join('
+  // Limita a 25 notícias mais recentes para não exceder o limite do Telegram
+  const top = data.slice(0, 25);
+  const groups = groupByCategory(top);
 
-');
+  // Ordem de prioridade das categorias (o que o gestor lê primeiro)
+  const PRIORITY = ['JUROS/BC', 'MACRO', 'FISCAL', 'BOLSA', 'CÂMBIO', 'COMMODITIES', 'M&A/CORP', 'POLÍTICA', 'GLOBAL', 'FINANÇAS', 'ECONOMIA'];
 
-  if (data.length > 15) msg += `
+  let msg = `📰 *RADAR DE MERCADO* — ${now} (Brasília)\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-_+ ${data.length - 15} outras manchetes no site._`;
+  let totalSent = 0;
+  for (const cat of PRIORITY) {
+    const items = groups[cat];
+    if (!items || items.length === 0) continue;
 
+    msg += `${categoryBadge(cat)} *${cat}*\n`;
+    for (const n of items.slice(0, 4)) { // máx 4 por categoria
+      const flag = countryFlag(n.country_tag);
+      const time = new Intl.DateTimeFormat('pt-BR', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+      }).format(new Date(n.published_at));
+      msg += `${flag} ${time} — [${n.title}](${n.url})\n`;
+      totalSent++;
+    }
+    msg += '\n';
+  }
+
+  if (data.length > totalSent) {
+    msg += `_📌 + ${data.length - totalSent} outras manchetes disponíveis no site._\n`;
+  }
+
+  msg += `\n_Fonte: Reuters, InfoMoney, CNBC, MarketWatch, FT e mais_`;
   return msg;
 }
 
 async function sendTelegram(text) {
+  // Telegram tem limite de 4096 caracteres por mensagem
+  const MAX = 4000;
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > MAX) {
+    let cut = remaining.lastIndexOf('\n', MAX);
+    if (cut === -1) cut = MAX;
+    chunks.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut + 1);
+  }
+  chunks.push(remaining);
+
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'Markdown', disable_web_page_preview: true }),
-  });
-  const data = await res.json();
-  if (!data.ok) throw new Error(`Telegram: ${JSON.stringify(data)}`);
-  console.log('✅ Radar enviado pro grupo do Telegram.');
+  for (const chunk of chunks) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: chunk,
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(`Telegram: ${JSON.stringify(data)}`);
+  }
+  console.log(`✅ Radar enviado (${chunks.length} parte(s)).`);
 }
 
 async function run() {
@@ -62,4 +130,3 @@ async function run() {
 }
 
 run().catch(err => { console.error('❌ Falha:', err.message); process.exitCode = 1; });
-
