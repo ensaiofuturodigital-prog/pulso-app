@@ -2,7 +2,8 @@ name: Telegram Daily Report
 
 on:
   schedule:
-    - cron: '7 9 * * *'  # todo dia às 09h07 UTC (06h07 Brasília) — fora da hora cheia pra evitar atraso/perda do agendamento
+    - cron: '7 9 * * *'    # horário principal: 09h07 UTC (06h07 Brasília)
+    - cron: '37 9 * * *'   # horário de backup: 09h37 UTC (06h37 Brasília) — só age se o principal falhar/atrasar
   workflow_dispatch:
     inputs:
       force:
@@ -15,11 +16,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verifica se a mensagem de hoje já foi enviada
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          RESP=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/telegram-daily-report.yml/runs?event=schedule&status=success&per_page=10")
+          ALREADY=$(echo "$RESP" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+today = '$TODAY'
+current_run_id = ${{ github.run_id }}
+found = any(r['id'] != current_run_id and r['created_at'].startswith(today) for r in d.get('workflow_runs', []))
+print('true' if found else 'false')
+")
+          echo "already=$ALREADY" >> "$GITHUB_OUTPUT"
+          if [ "$ALREADY" = "true" ]; then
+            echo "Já teve um envio com sucesso hoje — este disparo é só backup, não faz nada."
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.already == 'false'
         with:
           node-version: '22'
       - run: npm install
+        if: steps.check.outputs.already == 'false'
       - run: node scripts/telegram-daily-report.js
+        if: steps.check.outputs.already == 'false'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
