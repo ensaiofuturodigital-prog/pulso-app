@@ -611,6 +611,38 @@ button, input, select {
 .news-body { flex: 1; min-width: 0; }
 .news-title { font-size: 17px; line-height: 1.45; margin-bottom: 4px; }
 .news-source { font-family: var(--font-mono); font-size: 13px; color: var(--text-faint); }
+.news-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.news-cat-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  flex-shrink: 0;
+}
+/* ── Filtros de categoria do radar ── */
+#newsFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.news-filter-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1.5px solid;
+  background: transparent;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.15s, color 0.15s;
+}
+.news-filter-btn:hover { opacity: 0.85; }
 
 /* ---------- DATE NAV (Resumo do dia com navegação histórica) ---------- */
 .date-nav {
@@ -743,4 +775,5 @@ button, input, select {
   line-height: 1.5;
   max-width: 680px;
 }
+
 
