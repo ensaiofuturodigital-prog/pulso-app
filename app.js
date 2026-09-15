@@ -269,18 +269,6 @@ function renderNews() {
   }
 
   list.innerHTML = filtered.map(n => {
-    const newsDate = new Date(n.published_at);
-    const isToday = newsDate.toDateString() === new Date().toDateString();
-    const diffMins = Math.round((Date.now() - newsDate.getTime()) / 60000);
-    let time;
-    if (diffMins >= 0 && diffMins < 60) {
-      time = `há ${Math.max(1, diffMins)} min`;
-    } else {
-      time = new Intl.DateTimeFormat('pt-BR', {
-        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
-        ...(isToday ? {} : { day: '2-digit', month: '2-digit' }),
-      }).format(newsDate);
-    }
     const breaking = isBreaking(n.title);
     const flag = FLAG_MAP[n.country_tag] || '🌐';
     const cat = CAT_MAP[n.impact_tag];
@@ -289,7 +277,6 @@ function renderNews() {
       : '';
     return `
       <a class="news-row ${breaking ? 'is-breaking' : ''}" href="${n.url}" target="_blank" rel="noopener">
-        <span class="news-time">${time}</span>
         <div class="news-body">
           <div class="news-title">${breaking ? '<span class="breaking-tag">BREAKING</span> ' : ''}${flag} ${n.title}</div>
           <div class="news-meta">${catBadge}<span class="news-source">${n.source}</span></div>
@@ -997,5 +984,6 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch((err) => console.error('SW falhou:', err));
   });
 }
+
 
 
