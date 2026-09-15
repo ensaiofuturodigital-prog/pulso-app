@@ -600,14 +600,6 @@ button, input, select {
   0% { box-shadow: 0 0 3px rgba(229,72,77,0.2); }
   100% { box-shadow: 0 0 10px rgba(229,72,77,0.55); }
 }
-.news-time {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  color: var(--text-faint);
-  width: 42px;
-  flex-shrink: 0;
-  padding-top: 1px;
-}
 .news-body { flex: 1; min-width: 0; }
 .news-title { font-size: 17px; line-height: 1.45; margin-bottom: 4px; }
 .news-source { font-family: var(--font-mono); font-size: 13px; color: var(--text-faint); }
@@ -775,5 +767,6 @@ button, input, select {
   line-height: 1.5;
   max-width: 680px;
 }
+
 
 
