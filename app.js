@@ -219,14 +219,56 @@ function isBreaking(title) {
   return BREAKING_KEYWORDS.some(k => t.includes(k));
 }
 
+// Mapa de bandeiras por country_tag
+const FLAG_MAP = { BR:'🇧🇷', US:'🇺🇸', EA:'🇪🇺', CN:'🇨🇳', JP:'🇯🇵', GB:'🇬🇧', GLOBAL:'🌐' };
+// Mapa de labels e cores por categoria
+const CAT_MAP = {
+  MACRO:       { label:'MACRO',       color:'#3b82f6' },
+  JUROS:       { label:'JUROS',       color:'#8b5cf6' },
+  MERCADO:     { label:'MERCADO',     color:'#10b981' },
+  COMMODITIES: { label:'COMMODIT.',   color:'#f59e0b' },
+  FISCAL:      { label:'FISCAL',      color:'#ef4444' },
+  GEO:         { label:'GEOPOLÍT.',   color:'#f97316' },
+  CORPORATIVO: { label:'CORPORAT.',   color:'#6366f1' },
+  POLITICA:    { label:'POLÍTICA',    color:'#ec4899' },
+};
+
+let activeNewsFilter = 'TODOS';
+
+function renderNewsFilters() {
+  const wrap = document.getElementById('newsFilters');
+  if (!wrap) return;
+  const cats = ['TODOS', ...Object.keys(CAT_MAP)];
+  wrap.innerHTML = cats.map(c => {
+    const active = activeNewsFilter === c ? 'news-filter-active' : '';
+    const color = c === 'TODOS' ? '#64748b' : (CAT_MAP[c]?.color || '#64748b');
+    return `<button class="news-filter-btn ${active}" style="border-color:${color};${active ? 'background:'+color+';color:#fff' : 'color:'+color}" onclick="setNewsFilter('${c}')">${c === 'TODOS' ? 'TODOS' : CAT_MAP[c].label}</button>`;
+  }).join('');
+}
+
+function setNewsFilter(cat) {
+  activeNewsFilter = cat;
+  renderNewsFilters();
+  renderNews();
+}
+
 function renderNews() {
   const list = document.getElementById('newsList');
   if (newsCache.length === 0) {
-    list.innerHTML = '<p class="empty-note">Nenhuma notícia registrada ainda. O robô roda de hora em hora — se acabou de configurar, rode-o manualmente no GitHub Actions.</p>';
+    list.innerHTML = '<p class="empty-note">Nenhuma notícia registrada ainda. O robô roda de hora em hora.</p>';
     return;
   }
 
-  list.innerHTML = newsCache.map(n => {
+  const filtered = activeNewsFilter === 'TODOS'
+    ? newsCache
+    : newsCache.filter(n => n.impact_tag === activeNewsFilter);
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<p class="empty-note">Nenhuma notícia nessa categoria ainda.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(n => {
     const newsDate = new Date(n.published_at);
     const isToday = newsDate.toDateString() === new Date().toDateString();
     const diffMins = Math.round((Date.now() - newsDate.getTime()) / 60000);
@@ -240,12 +282,17 @@ function renderNews() {
       }).format(newsDate);
     }
     const breaking = isBreaking(n.title);
+    const flag = FLAG_MAP[n.country_tag] || '🌐';
+    const cat = CAT_MAP[n.impact_tag];
+    const catBadge = cat
+      ? `<span class="news-cat-badge" style="background:${cat.color}">${cat.label}</span>`
+      : '';
     return `
       <a class="news-row ${breaking ? 'is-breaking' : ''}" href="${n.url}" target="_blank" rel="noopener">
         <span class="news-time">${time}</span>
         <div class="news-body">
-          <div class="news-title">${breaking ? '<span class="breaking-tag">BREAKING</span> ' : ''}${n.title}</div>
-          <div class="news-source">${n.source}</div>
+          <div class="news-title">${breaking ? '<span class="breaking-tag">BREAKING</span> ' : ''}${flag} ${n.title}</div>
+          <div class="news-meta">${catBadge}<span class="news-source">${n.source}</span></div>
         </div>
       </a>`;
   }).join('');
@@ -270,6 +317,7 @@ async function loadOvernightNews() {
     }
 
     newsCache = data;
+    renderNewsFilters();
     renderNews();
   } catch (err) {
     console.error(err);
@@ -949,4 +997,5 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch((err) => console.error('SW falhou:', err));
   });
 }
+
 
