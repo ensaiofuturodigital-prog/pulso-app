@@ -8,6 +8,45 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// =============================================================
+// BREAKING NEWS — palavras que indicam notícia muito importante
+// =============================================================
+const BREAKING_KEYWORDS = [
+  // Decisões de banco central
+  'fed eleva', 'fed corta', 'fed mantém', 'fed sobe', 'fed reduz',
+  'copom eleva', 'copom corta', 'copom mantém', 'copom sobe', 'copom reduz',
+  'banco central eleva', 'banco central corta', 'banco central sobe',
+  'bce eleva', 'bce corta', 'pboc eleva', 'boj eleva', 'juros sobem', 'juros caem',
+  'selic sobe', 'selic cai', 'selic eleva', 'selic reduz',
+  // Crises e emergências
+  'colapso', 'colapsa', 'crash', 'crise', 'emergência', 'emergencia',
+  'recessão confirmada', 'recessao confirmada', 'default', 'calote',
+  'falência', 'falencia', 'quebra',
+  // Guerras e geopolítica grave
+  'guerra', 'ataque', 'invasão', 'invasao', 'sanções imediatas', 'sancoes imediatas',
+  'conflito armado', 'golpe de estado', 'estado de emergência',
+  // Mercados em colapso
+  'circuit breaker', 'circuit-breaker', 'bolsa despenca', 'bolsa cai', 'bolsa afunda',
+  'ibovespa despenca', 'ibovespa afunda', 'nasdaq despenca', 'dow jones despenca',
+  'dólar dispara', 'dolar dispara', 'dólar rompe', 'dolar rompe',
+  'petróleo despenca', 'petroleo despenca', 'petróleo dispara', 'petroleo dispara',
+  'ouro dispara', 'ouro bate recorde',
+  // Dados macro bombásticos
+  'pib recua', 'pib contrai', 'pib desacelera', 'desemprego recorde',
+  'inflação recorde', 'inflacao recorde', 'superávit recorde', 'deficit recorde',
+  'resultado primário negativo', 'arcabouço fiscal rompido',
+  // Corporativo crítico
+  'fusão bilionária', 'fusao bilionaria', 'aquisição bilionária', 'aquisicao bilionaria',
+  'ipo bilionário', 'ipo bilionario', 'mega fusão', 'mega fusao',
+  // Breaking explícito
+  'breaking', 'urgente', 'última hora', 'ultima hora', 'agora',
+];
+
+function isBreaking(title) {
+  const t = title.toLowerCase();
+  return BREAKING_KEYWORDS.some(k => t.includes(k));
+}
+
 function countryFlag(tag) {
   const flags = { BR: '🇧🇷', US: '🇺🇸', EA: '🇪🇺', CN: '🇨🇳', JP: '🇯🇵', GLOBAL: '🌐' };
   return flags[tag] || '🌐';
@@ -30,7 +69,6 @@ function categoryBadge(cat) {
   return badges[cat] || '📰';
 }
 
-// Agrupa notícias por categoria para o digest
 function groupByCategory(items) {
   const groups = {};
   for (const n of items) {
@@ -41,8 +79,27 @@ function groupByCategory(items) {
   return groups;
 }
 
+// =============================================================
+// FORMATA UMA NOTÍCIA — com ou sem destaque de breaking
+// =============================================================
+function formatNewsLine(n) {
+  const flag = countryFlag(n.country_tag);
+  const breaking = isBreaking(n.title);
+
+  if (breaking) {
+    // Caixa de destaque total — chama atenção no feed do Telegram
+    return (
+      `┌─────────────────────────┐\n` +
+      `│ ⚡ *BREAKING NEWS* ⚡\n` +
+      `│ ${flag} *[${n.title}](${n.url})*\n` +
+      `└─────────────────────────┘\n`
+    );
+  }
+
+  return `${flag} [${n.title}](${n.url})\n`;
+}
+
 async function buildDigest() {
-  // Janela de 7h: cobre com folga o maior intervalo entre os horários fixos
   const cutoff = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('news')
@@ -57,28 +114,37 @@ async function buildDigest() {
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
   }).format(new Date());
 
-  // Limita a 25 notícias mais recentes para não exceder o limite do Telegram
   const top = data.slice(0, 25);
-  const groups = groupByCategory(top);
 
-  // Ordem de prioridade das categorias (o que o gestor lê primeiro)
+  // Separar breaking das normais para exibir breaking primeiro
+  const breakingItems = top.filter(n => isBreaking(n.title));
+  const normalItems   = top.filter(n => !isBreaking(n.title));
+
   const PRIORITY = ['JUROS/BC', 'MACRO', 'FISCAL', 'BOLSA', 'CÂMBIO', 'COMMODITIES', 'M&A/CORP', 'POLÍTICA', 'GLOBAL', 'FINANÇAS', 'ECONOMIA'];
 
   let msg = `📰 *RADAR DE MERCADO* — ${now} (Brasília)\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  let totalSent = 0;
+  // 1) BREAKING NEWS no topo — se houver
+  if (breakingItems.length > 0) {
+    msg += `🚨 *ATENÇÃO — NOTÍCIAS CRÍTICAS*\n\n`;
+    for (const n of breakingItems) {
+      msg += formatNewsLine(n);
+    }
+    msg += `\n`;
+  }
+
+  // 2) Demais notícias agrupadas por categoria
+  const groups = groupByCategory(normalItems);
+  let totalSent = breakingItems.length;
+
   for (const cat of PRIORITY) {
     const items = groups[cat];
     if (!items || items.length === 0) continue;
 
     msg += `${categoryBadge(cat)} *${cat}*\n`;
-    for (const n of items.slice(0, 4)) { // máx 4 por categoria
-      const flag = countryFlag(n.country_tag);
-      const time = new Intl.DateTimeFormat('pt-BR', {
-        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
-      }).format(new Date(n.published_at));
-      msg += `${flag} ${time} — [${n.title}](${n.url})\n`;
+    for (const n of items.slice(0, 4)) {
+      msg += formatNewsLine(n);
       totalSent++;
     }
     msg += '\n';
@@ -93,7 +159,6 @@ async function buildDigest() {
 }
 
 async function sendTelegram(text) {
-  // Telegram tem limite de 4096 caracteres por mensagem
   const MAX = 4000;
   const chunks = [];
   let remaining = text;
