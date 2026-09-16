@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: fetch-news-radar
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   fetch:
@@ -18,7 +18,25 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
-      - run: node scripts/fetch-news-radar.js
+
+      - name: Coleta notícias (roda sempre)
+        run: node scripts/fetch-news-radar.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+      - name: Envia Radar ao Telegram (roda nos :30)
+        run: |
+          MINUTE=$(date -u +%M)
+          echo "Minuto atual (UTC): $MINUTE"
+          if [ "$MINUTE" = "30" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "✅ Minuto :30 ou dispatch manual — enviando ao Telegram..."
+            node scripts/telegram-news-radar.js
+          else
+            echo "⏭️  Minuto :00 — só coletou, não envia Telegram."
+          fi
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
