@@ -5,6 +5,11 @@ on:
     - cron: '17 * * * *'
   workflow_dispatch:
 
+# Garante que só 1 run por vez — cancela a anterior se houver sobreposição
+concurrency:
+  group: telegram-news-radar
+  cancel-in-progress: false
+
 jobs:
   send:
     runs-on: ubuntu-latest
