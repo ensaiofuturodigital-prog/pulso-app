@@ -5,25 +5,36 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// AbortController é GLOBAL no Node 18+ — sem import necessário
-async function fetchRSS(url, ms = 15000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ms);
+// ─── TRADUÇÃO (MyMemory — gratuito, sem API key) ──────────────────────────────
+async function translateToPortuguese(text) {
   try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PulsoRadar/3.0)',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-      },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.text();
-  } finally {
-    clearTimeout(timer);
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|pt-BR`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const data = await res.json();
+    const translated = data.responseData?.translatedText;
+    // MyMemory retorna o original se não conseguir traduzir
+    if (!translated || translated === text) return text;
+    return translated;
+  } catch {
+    return text; // falha silenciosa — mantém original
   }
 }
 
+// Detecta se o título está em inglês (feeds com lang='en')
+// Traduz em lotes para não sobrecarregar a API
+async function translateBatch(items) {
+  const toTranslate = items.filter(i => i.lang === 'en');
+  console.log(`🔤 Traduzindo ${toTranslate.length} títulos em inglês...`);
+
+  for (const item of toTranslate) {
+    item.title = await translateToPortuguese(item.title);
+    // Pequena pausa para não sobrecarregar a API (1000 req/dia gratuitas)
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return items;
+}
+
+// ─── FEEDS RSS ────────────────────────────────────────────────────────────────
 const FEEDS = [
   { url: 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Economia BR', lang: 'pt', category: 'MACRO' },
   { url: 'https://news.google.com/rss/search?q=Fed+OR+BCE+OR+%22banco+central%22+OR+Copom+OR+Selic&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Bancos Centrais', lang: 'pt', category: 'JUROS/BC' },
@@ -79,6 +90,21 @@ function passes(title, lang) {
   return FINANCE_PT.some(k => t.includes(k));
 }
 
+async function fetchRSS(url, ms = 15000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulsoRadar/3.0)', 'Accept': 'application/rss+xml, application/xml, text/xml, */*' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function parseRss(xml, feed) {
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => {
     const block = m[1];
@@ -87,7 +113,7 @@ function parseRss(xml, feed) {
     const link  = (block.match(/<link>([\s\S]*?)<\/link>/)   || [])[1]?.trim() || '';
     const pub   = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '';
     const date  = pub ? new Date(pub) : null;
-    return { title, url: link, pubDate: date, source: feed.source, category: feed.category };
+    return { title, url: link, pubDate: date, source: feed.source, category: feed.category, lang: feed.lang };
   }).filter(i => i.title && i.url && i.pubDate && !isNaN(i.pubDate) && passes(i.title, feed.lang));
 }
 
@@ -106,7 +132,7 @@ async function run() {
     }
   }
 
-  // Deduplicação
+  // Deduplicação por título (antes de traduzir)
   const seen = new Set();
   const unique = all.filter(i => {
     const key = i.title.toLowerCase().slice(0, 60);
@@ -117,11 +143,15 @@ async function run() {
 
   console.log(`\n📰 ${unique.length} manchetes únicas`);
 
-  if (unique.length > 0) {
-    const rows = unique.map(i => ({
+  // Traduzir títulos em inglês
+  const translated = await translateBatch(unique);
+  console.log(`✅ Tradução concluída.`);
+
+  if (translated.length > 0) {
+    const rows = translated.map(i => ({
       published_at: i.pubDate.toISOString(),
       source: i.source,
-      title: i.title,
+      title: i.title, // já em português
       url: i.url,
       impact_tag: i.category,
       region: 'radar',
@@ -129,7 +159,7 @@ async function run() {
     }));
     const { error } = await supabase.from('news').upsert(rows, { onConflict: 'url', ignoreDuplicates: true });
     if (error) throw error;
-    console.log(`✅ ${rows.length} salvas no banco.`);
+    console.log(`✅ ${rows.length} salvas no banco em português.`);
   }
 
   // Limpeza 48h
