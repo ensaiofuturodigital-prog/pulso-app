@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0,30 * * * *'
   workflow_dispatch:
+    inputs:
+      force_daily:
+        description: 'Forcar envio das probabilidades agora'
+        required: false
+        default: 'false'
 
 concurrency:
   group: fetch-news-radar
@@ -40,21 +45,21 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Envia Probabilidades WDO/WIN ao Telegram (08:30 UTC = 05:30 Brasília, seg-sex)
+      - name: Envia Probabilidades WDO/WIN (08:30 UTC seg-sex ou force)
         run: |
           HOUR=$(date -u +%H)
           MINUTE=$(date -u +%M)
           WEEKDAY=$(date -u +%u)
-          FORCE="${{ github.event.inputs.force_daily || 'false' }}"
+          FORCE="${{ github.event.inputs.force_daily }}"
           if [ "$FORCE" = "true" ] || ([ "$HOUR" = "08" ] && [ "$MINUTE" = "30" ] && [ "$WEEKDAY" -le "5" ]); then
             echo "✅ Enviando probabilidades WDO/WIN..."
             node scripts/telegram-daily-report.js
           else
-            echo "⏭️  Não é horário das probabilidades (08:30 UTC seg-sex)."
+            echo "⏭️  Fora do horário das probabilidades."
           fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          FORCE_SEND: ${{ github.event.inputs.force_daily || 'false' }}
+          FORCE_SEND: ${{ github.event.inputs.force_daily }}
