@@ -1,5 +1,15 @@
 import fetch from 'node-fetch';
 
+const BOT = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT = process.env.TELEGRAM_CHAT_ID;
+
+async function sendMsg(text) {
+  await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ chat_id: CHAT, text })
+  });
+}
+
 async function testGoogle(text) {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(text)}`;
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
@@ -15,20 +25,22 @@ async function testMyMemory(text) {
 }
 
 const TEST = 'Fed holds interest rates steady amid inflation concerns';
-
-console.log('Testando APIs de tradução...');
-console.log('Texto original:', TEST);
+let msg = '🔤 TESTE DE TRADUÇÃO\n\n';
+msg += `Original: ${TEST}\n\n`;
 
 try {
   const g = await testGoogle(TEST);
-  console.log('✅ Google Translate:', g);
+  msg += `✅ Google Translate:\n${g}\n\n`;
 } catch(e) {
-  console.log('❌ Google Translate:', e.message);
+  msg += `❌ Google Translate: ${e.message}\n\n`;
 }
 
 try {
   const m = await testMyMemory(TEST);
-  console.log('✅ MyMemory:', m);
+  msg += `✅ MyMemory:\n${m}\n`;
 } catch(e) {
-  console.log('❌ MyMemory:', e.message);
+  msg += `❌ MyMemory: ${e.message}\n`;
 }
+
+await sendMsg(msg);
+console.log('Resultado enviado ao Telegram!');
