@@ -25,18 +25,36 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
-      - name: Envia Radar ao Telegram (roda nos :30)
+      - name: Envia Radar de Notícias ao Telegram (roda nos :30)
         run: |
           MINUTE=$(date -u +%M)
-          echo "Minuto atual (UTC): $MINUTE"
           if [ "$MINUTE" = "30" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "✅ Minuto :30 ou dispatch manual — enviando ao Telegram..."
+            echo "✅ Enviando radar de notícias..."
             node scripts/telegram-news-radar.js
           else
-            echo "⏭️  Minuto :00 — só coletou, não envia Telegram."
+            echo "⏭️  Minuto :00 — só coletou notícias."
           fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Envia Probabilidades WDO/WIN ao Telegram (08:30 UTC = 05:30 Brasília, seg-sex)
+        run: |
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          WEEKDAY=$(date -u +%u)
+          FORCE="${{ github.event.inputs.force_daily || 'false' }}"
+          if [ "$FORCE" = "true" ] || ([ "$HOUR" = "08" ] && [ "$MINUTE" = "30" ] && [ "$WEEKDAY" -le "5" ]); then
+            echo "✅ Enviando probabilidades WDO/WIN..."
+            node scripts/telegram-daily-report.js
+          else
+            echo "⏭️  Não é horário das probabilidades (08:30 UTC seg-sex)."
+          fi
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_SEND: ${{ github.event.inputs.force_daily || 'false' }}
