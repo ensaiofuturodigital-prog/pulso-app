@@ -1,0 +1,70 @@
+name: Pulso Radar
+
+on:
+  schedule:
+    - cron: '0,30 * * * *'
+  repository_dispatch:
+    types: [run-radar]
+  workflow_dispatch:
+    inputs:
+      force_daily:
+        description: 'Forcar envio das probabilidades'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: pulso-radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+
+      - name: Coleta e traduz notícias
+        run: node scripts/fetch-news-radar.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+      - name: Envia Radar ao Telegram
+        run: node scripts/telegram-news-radar.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Envia Probabilidades WDO/WIN (seg-sex 05:30 Brasília = 08:30 UTC)
+        run: |
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          WEEKDAY=$(date -u +%u)
+          FORCE="${{ github.event.inputs.force_daily }}"
+          if [ "$FORCE" = "true" ] || ([ "$HOUR" = "08" ] && [ "$MINUTE" = "30" ] && [ "$WEEKDAY" -le "5" ]); then
+            echo "✅ Enviando probabilidades..."
+            node scripts/telegram-daily-report.js
+          else
+            echo "⏭️  Fora do horário das probabilidades."
+          fi
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_SEND: ${{ github.event.inputs.force_daily }}
+
+      - name: Auto-reagenda próxima execução em 30 minutos
+        run: |
+          curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -d '{"event_type":"run-radar"}' \
+            "https://api.github.com/repos/${{ github.repository }}/dispatches"
+          echo "✅ Próxima execução agendada em ~30 min via repository_dispatch"
