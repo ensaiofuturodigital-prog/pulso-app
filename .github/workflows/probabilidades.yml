@@ -1,0 +1,28 @@
+name: Probabilidades WDO/WIN
+
+on:
+  schedule:
+    - cron: '0 8 * * 1-5'
+    - cron: '0 9 * * 1-5'
+    - cron: '0 10 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: probabilidades
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: node scripts/telegram-daily-report.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
