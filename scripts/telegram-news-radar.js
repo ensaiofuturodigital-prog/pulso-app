@@ -122,10 +122,6 @@ async function buildDigest() {
     msg += '\n';
   }
 
-  if (data.length > totalSent) {
-    msg += `_📌 + ${data.length - totalSent} manchetes adicionais no site._\n`;
-  }
-
   return msg;
 }
 
@@ -166,3 +162,4 @@ async function run() {
 }
 
 run().catch(err => { console.error('❌ Falha:', err.message); process.exitCode = 1; });
+
