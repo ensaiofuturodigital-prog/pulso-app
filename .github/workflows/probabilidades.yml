@@ -37,14 +37,7 @@ jobs:
           RESP=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/actions/workflows/probabilidades.yml/runs?status=success&per_page=5")
           TODAY=$(date -u +%Y-%m-%d)
-          ALREADY=$(echo "$RESP" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-runs=d.get('workflow_runs',[])
-found=any(r['created_at'].startswith('$TODAY') for r in runs)
-print('true' if found else 'false')
-")
-          if [ "$ALREADY" = "true" ]; then
+          if echo "$RESP" | grep -q "\"created_at\":\"${TODAY}"; then
             echo "should_send=false" >> "$GITHUB_OUTPUT"
             echo "Backup (06:07 Brasília) — principal já rodou hoje com sucesso, pulando."
           else
