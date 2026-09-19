@@ -40,25 +40,22 @@ jobs:
             node scripts/telegram-news-radar.js
             exit 0
           fi
-          NOW=$(TZ='America/Sao_Paulo' date +%H:%M)
+          NOW_EPOCH=$(TZ='America/Sao_Paulo' date +%s)
+          TODAY=$(TZ='America/Sao_Paulo' date +%Y-%m-%d)
           SEND="false"
           for T in 00:17 04:17 07:17 11:17 15:17 18:17 22:17; do
-            DIFF=$(python3 -c "
-from datetime import datetime
-now=datetime.strptime('$NOW','%H:%M')
-t=datetime.strptime('$T','%H:%M')
-diff=(now-t).total_seconds()/60
-diff=diff+1440 if diff<0 else diff
-print(int(diff))")
+            T_EPOCH=$(TZ='America/Sao_Paulo' date -d "$TODAY $T" +%s)
+            DIFF=$(( (NOW_EPOCH - T_EPOCH) / 60 ))
+            if [ "$DIFF" -lt 0 ]; then DIFF=$(( DIFF + 1440 )); fi
             if [ "$DIFF" -ge 0 ] && [ "$DIFF" -lt 20 ]; then
               SEND="true"
             fi
           done
           if [ "$SEND" = "true" ]; then
-            echo "✅ $NOW (Brasília) — enviando ao Telegram..."
+            echo "✅ $(TZ='America/Sao_Paulo' date +%H:%M) (Brasília) — enviando ao Telegram..."
             node scripts/telegram-news-radar.js
           else
-            echo "⏭️  $NOW (Brasília) — só coletou, fora dos horários de envio."
+            echo "⏭️  $(TZ='America/Sao_Paulo' date +%H:%M) (Brasília) — só coletou, fora dos horários de envio."
           fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
