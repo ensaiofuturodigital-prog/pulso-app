@@ -2,11 +2,11 @@ name: Fetch News Radar
 
 on:
   schedule:
-    - cron: '0,30 * * * *'
+    - cron: '*/15 * * * *'   # coleta a cada 15 min — notícias sempre frescas
   workflow_dispatch:
     inputs:
-      force_daily:
-        description: 'Forcar envio das probabilidades agora'
+      force_telegram:
+        description: 'Forçar envio ao Telegram agora (teste)'
         required: false
         default: 'false'
 
@@ -24,42 +24,45 @@ jobs:
           node-version: '22'
       - run: npm install
 
-      - name: Coleta notícias (roda sempre)
+      # PASSO 1 — Sempre coleta e salva as notícias no Supabase
+      - name: Coleta notícias dos 10 feeds RSS profissionais
         run: node scripts/fetch-news-radar.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
-      - name: Envia Radar de Notícias ao Telegram (roda nos :30)
+      # PASSO 2 — Envia ao Telegram só nos 7 horários fixos (Brasília)
+      # Horários: 00:17 / 04:17 / 07:17 / 11:17 / 15:17 / 18:17 / 22:17
+      - name: Envia Radar ao Telegram (só nos horários fixos)
         run: |
-          MINUTE=$(date -u +%M)
-          if [ "$MINUTE" = "30" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "✅ Enviando radar de notícias..."
+          FORCE="${{ github.event.inputs.force_telegram }}"
+          if [ "$FORCE" = "true" ]; then
+            echo "Envio forçado manualmente."
+            node scripts/telegram-news-radar.js
+            exit 0
+          fi
+          NOW=$(TZ='America/Sao_Paulo' date +%H:%M)
+          SEND="false"
+          for T in 00:17 04:17 07:17 11:17 15:17 18:17 22:17; do
+            DIFF=$(python3 -c "
+from datetime import datetime
+now=datetime.strptime('$NOW','%H:%M')
+t=datetime.strptime('$T','%H:%M')
+diff=(now-t).total_seconds()/60
+diff=diff+1440 if diff<0 else diff
+print(int(diff))")
+            if [ "$DIFF" -ge 0 ] && [ "$DIFF" -lt 20 ]; then
+              SEND="true"
+            fi
+          done
+          if [ "$SEND" = "true" ]; then
+            echo "✅ Horário de envio detectado ($NOW Brasília) — enviando ao Telegram..."
             node scripts/telegram-news-radar.js
           else
-            echo "⏭️  Minuto :00 — só coletou notícias."
+            echo "⏭️  $NOW (Brasília) — só coletou, não é hora de enviar ao Telegram."
           fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
-      - name: Envia Probabilidades WDO/WIN (08:30 UTC seg-sex ou force)
-        run: |
-          HOUR=$(date -u +%H)
-          MINUTE=$(date -u +%M)
-          WEEKDAY=$(date -u +%u)
-          FORCE="${{ github.event.inputs.force_daily }}"
-          if [ "$FORCE" = "true" ] || ([ "$HOUR" = "08" ] && [ "$MINUTE" = "30" ] && [ "$WEEKDAY" -le "5" ]); then
-            echo "✅ Enviando probabilidades WDO/WIN..."
-            node scripts/telegram-daily-report.js
-          else
-            echo "⏭️  Fora do horário das probabilidades."
-          fi
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          FORCE_SEND: ${{ github.event.inputs.force_daily }}
