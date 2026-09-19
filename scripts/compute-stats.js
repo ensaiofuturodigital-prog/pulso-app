@@ -155,7 +155,7 @@ function detectStructuralBreak(actualValues) {
 // igual o resto do sistema (compute-baseline-stats.js, compute-accuracy.js)
 // já fazia.
 async function loadPriceDirections(asset) {
-  const rows = await fetchAllRows('price_daily', 'price_date, open, close', (q) => q.eq('asset', asset));
+  const rows = await fetchAllRows('price_daily', 'price_date, open, close', (q) => q.eq('asset', asset), 'price_date');
   const map = {};
   for (const r of rows) {
     if (r.open === null || r.close === null) continue;
@@ -273,4 +273,7 @@ async function run() {
   console.log('Finalizado.');
 }
  
-run();
+run().catch((err) => {
+  console.error('Erro fatal em compute-stats.js:', err);
+  process.exit(1);
+});
