@@ -24,41 +24,17 @@ jobs:
           node-version: '22'
       - run: npm install
 
-      # PASSO 1 — Sempre coleta e salva no Supabase
-      - name: Coleta notícias dos 10 feeds RSS profissionais
+      - name: Coleta notícias dos feeds RSS profissionais
         run: node scripts/fetch-news-radar.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
-      # PASSO 2 — Telegram só nos 7 horários fixos (Brasília) ou force manual
-      - name: Envia Radar ao Telegram (horários fixos ou manual)
-        run: |
-          FORCE="${{ github.event.inputs.force_telegram }}"
-          if [ "$FORCE" = "true" ]; then
-            echo "✅ Envio forçado manualmente."
-            node scripts/telegram-news-radar.js
-            exit 0
-          fi
-          NOW_EPOCH=$(TZ='America/Sao_Paulo' date +%s)
-          TODAY=$(TZ='America/Sao_Paulo' date +%Y-%m-%d)
-          SEND="false"
-          for T in 00:17 04:17 07:17 11:17 15:17 18:17 22:17; do
-            T_EPOCH=$(TZ='America/Sao_Paulo' date -d "$TODAY $T" +%s)
-            DIFF=$(( (NOW_EPOCH - T_EPOCH) / 60 ))
-            if [ "$DIFF" -lt 0 ]; then DIFF=$(( DIFF + 1440 )); fi
-            if [ "$DIFF" -ge 0 ] && [ "$DIFF" -lt 20 ]; then
-              SEND="true"
-            fi
-          done
-          if [ "$SEND" = "true" ]; then
-            echo "✅ $(TZ='America/Sao_Paulo' date +%H:%M) (Brasília) — enviando ao Telegram..."
-            node scripts/telegram-news-radar.js
-          else
-            echo "⏭️  $(TZ='America/Sao_Paulo' date +%H:%M) (Brasília) — só coletou, fora dos horários de envio."
-          fi
+      - name: Envia Radar ao Telegram (decisão de horário é feita no próprio script)
+        run: node scripts/telegram-news-radar.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_SEND: ${{ github.event.inputs.force_telegram }}
