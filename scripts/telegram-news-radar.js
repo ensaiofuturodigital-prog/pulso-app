@@ -160,7 +160,7 @@ async function sendTelegram(text) {
 // cada poucos minutos. Por isso: janela larga (55 min) ao redor de cada
 // horário-alvo + trava de duplicidade no Supabase (garante 1 envio por slot,
 // mesmo que o workflow rode várias vezes dentro da mesma janela).
-const SEND_TARGETS_BRT = ['00:17', '04:17', '07:17', '11:17', '15:17', '18:17', '22:17'];
+const SEND_TARGETS_BRT = ['04:38', '06:38', '08:38', '11:38', '18:38'];
 const TOLERANCE_MIN = 55;
 
 function nowInBrasilia() {
