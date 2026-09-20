@@ -3,8 +3,13 @@ name: Probabilidades WDO/WIN
 on:
   schedule:
     - cron: '37 8 * * 1-5'   # 05:37 Brasília (horário principal)
-    - cron: '7 9 * * 1-5'    # 06:07 Brasília (backup — só envia se o principal falhou)
+    - cron: '7 9 * * 1-5'    # 06:07 Brasília (backup — só envia se o principal falhou ou atrasou)
   workflow_dispatch:
+    inputs:
+      force_send:
+        description: 'Forçar envio agora (ignora dia útil e duplicata)'
+        required: false
+        default: 'false'
 
 concurrency:
   group: probabilidades
@@ -20,37 +25,11 @@ jobs:
           node-version: '22'
       - run: npm install
 
-      - name: Verifica se já foi enviado hoje (anti-duplicata para o backup)
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          HOUR=$(date -u +%H)
-          MINUTE=$(date -u +%M)
-          # Se for o horário principal (08:37 UTC), envia sempre
-          if [ "$HOUR" = "08" ] && [ "$MINUTE" = "37" ]; then
-            echo "should_send=true" >> "$GITHUB_OUTPUT"
-            echo "Horário principal (05:37 Brasília) — enviando."
-            exit 0
-          fi
-          # Se for o backup (09:07 UTC), só envia se não houve sucesso hoje
-          RESP=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/probabilidades.yml/runs?status=success&per_page=5")
-          TODAY=$(date -u +%Y-%m-%d)
-          if echo "$RESP" | grep -q "\"created_at\":\"${TODAY}"; then
-            echo "should_send=false" >> "$GITHUB_OUTPUT"
-            echo "Backup (06:07 Brasília) — principal já rodou hoje com sucesso, pulando."
-          else
-            echo "should_send=true" >> "$GITHUB_OUTPUT"
-            echo "Backup (06:07 Brasília) — principal não rodou hoje, enviando agora."
-          fi
-
-      - name: Envia probabilidades WDO/WIN ao Telegram
-        if: steps.check.outputs.should_send == 'true' || github.event_name == 'workflow_dispatch'
+      - name: Envia probabilidades WDO/WIN ao Telegram (dia útil + duplicata checados no script)
         run: node scripts/telegram-daily-report.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          FORCE_SEND: 'true'
+          FORCE_SEND: ${{ github.event.inputs.force_send }}
