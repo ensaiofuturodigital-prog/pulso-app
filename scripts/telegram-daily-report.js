@@ -189,6 +189,15 @@ async function sendTelegram(text) {
   console.log('✅ Mensagem enviada pro grupo do Telegram.');
 }
 
+async function claimSlot(slot) {
+  const { error } = await supabase.from('telegram_sends').insert({ slot });
+  if (error) {
+    if (error.code === '23505') return false; // já enviado hoje — evita duplicata do backup
+    throw error;
+  }
+  return true;
+}
+
 async function run() {
   const dateStr = todayStrBRT();
   const forced = process.env.FORCE_SEND === 'true';
@@ -196,7 +205,15 @@ async function run() {
     console.log(`${dateStr} é fim de semana ou feriado — sem dado econômico novo, não envia probabilidades hoje.`);
     return;
   }
-  if (forced) console.log('⚠️ Envio forçado (teste manual) — ignorando checagem de fim de semana/feriado.');
+  if (forced) {
+    console.log('⚠️ Envio forçado (teste manual) — ignorando checagem de fim de semana/feriado e de duplicata.');
+  } else {
+    const claimed = await claimSlot(`prob_${dateStr}`);
+    if (!claimed) {
+      console.log(`⏭️  Probabilidades de ${dateStr} já enviadas hoje (principal ou backup) — evitando duplicata.`);
+      return;
+    }
+  }
   const msg = await buildReport();
   await sendTelegram(msg);
 }
