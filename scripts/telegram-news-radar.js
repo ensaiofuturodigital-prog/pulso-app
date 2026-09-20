@@ -155,10 +155,74 @@ async function sendTelegram(text) {
   console.log(`✅ Radar enviado (${chunks.length} parte(s)).`);
 }
 
+// ─── DECISÃO DE ENVIO — não depende do GitHub Actions rodar no minuto exato ───
+// O cron do GitHub é "melhor esforço" e pode atrasar bastante quando roda a
+// cada poucos minutos. Por isso: janela larga (55 min) ao redor de cada
+// horário-alvo + trava de duplicidade no Supabase (garante 1 envio por slot,
+// mesmo que o workflow rode várias vezes dentro da mesma janela).
+const SEND_TARGETS_BRT = ['00:17', '04:17', '07:17', '11:17', '15:17', '18:17', '22:17'];
+const TOLERANCE_MIN = 55;
+
+function nowInBrasilia() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const get = (t) => parts.find(p => p.type === t).value;
+  return {
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+    hour: parseInt(get('hour'), 10),
+    minute: parseInt(get('minute'), 10),
+  };
+}
+
+function findMatchingSlot() {
+  const { date, hour, minute } = nowInBrasilia();
+  const nowMin = hour * 60 + minute;
+  for (const t of SEND_TARGETS_BRT) {
+    const [th, tm] = t.split(':').map(Number);
+    const targetMin = th * 60 + tm;
+    let diff = nowMin - targetMin;
+    if (diff < -720) diff += 1440;   // trata virada de dia nos dois sentidos
+    if (diff > 720) diff -= 1440;
+    if (Math.abs(diff) <= TOLERANCE_MIN) {
+      return `${date}_${t}`;
+    }
+  }
+  return null;
+}
+
+async function claimSlot(slot) {
+  const { error } = await supabase.from('telegram_sends').insert({ slot });
+  if (error) {
+    if (error.code === '23505') return false; // já enviado nesse slot — duplicata evitada
+    throw error;
+  }
+  return true;
+}
+
 async function run() {
+  const force = process.env.FORCE_SEND === 'true';
+  let slot = null;
+
+  if (!force) {
+    slot = findMatchingSlot();
+    if (!slot) {
+      console.log(`⏭️  ${nowInBrasilia().hour}:${String(nowInBrasilia().minute).padStart(2, '0')} (Brasília) — fora da janela de envio, só coletando.`);
+      return;
+    }
+    const claimed = await claimSlot(slot);
+    if (!claimed) {
+      console.log(`⏭️  Slot ${slot} já enviado anteriormente — evitando duplicata.`);
+      return;
+    }
+  }
+
   const msg = await buildDigest();
   if (!msg) { console.log('Nenhuma notícia nova — nada pra enviar.'); return; }
   await sendTelegram(msg);
+  console.log(force ? '✅ Envio forçado concluído.' : `✅ Slot ${slot} enviado com sucesso.`);
 }
 
 run().catch(err => { console.error('❌ Falha:', err.message); process.exitCode = 1; });
