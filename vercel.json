@@ -1,3 +1,12 @@
 {
-  "cleanUrls": true
+  "cleanUrls": true,
+  "crons": [
+    { "path": "/api/cron-trigger?job=radar", "schedule": "38 7 * * *" },
+    { "path": "/api/cron-trigger?job=radar", "schedule": "38 9 * * *" },
+    { "path": "/api/cron-trigger?job=radar", "schedule": "38 11 * * *" },
+    { "path": "/api/cron-trigger?job=radar", "schedule": "38 14 * * *" },
+    { "path": "/api/cron-trigger?job=radar", "schedule": "38 21 * * *" },
+    { "path": "/api/cron-trigger?job=prob", "schedule": "37 8 * * 1-5" },
+    { "path": "/api/cron-trigger?job=prob", "schedule": "7 9 * * 1-5" }
+  ]
 }
