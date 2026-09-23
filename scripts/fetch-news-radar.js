@@ -5,18 +5,39 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ─── TRADUÇÃO (MyMemory — gratuito, sem API key) ──────────────────────────────
+// ─── TRADUÇÃO ──────────────────────────────────────────────────────────────
+// Google Translate (endpoint público, sem API key) como principal — aguenta
+// bem mais volume que o MyMemory. MyMemory fica como reserva, e só se ambos
+// falharem é que o título original em inglês é mantido.
+async function translateGoogle(text) {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  // Formato: [[["texto traduzido","texto original",null,null,...], ...], ...]
+  const translated = data?.[0]?.map(chunk => chunk[0]).join('') || '';
+  if (!translated) throw new Error('resposta vazia');
+  return translated;
+}
+
+async function translateMyMemory(text) {
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|pt-BR`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const data = await res.json();
+  const translated = data.responseData?.translatedText;
+  if (!translated || translated === text) throw new Error('sem tradução');
+  return translated;
+}
+
 async function translateToPortuguese(text) {
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|pt-BR`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    const data = await res.json();
-    const translated = data.responseData?.translatedText;
-    // MyMemory retorna o original se não conseguir traduzir
-    if (!translated || translated === text) return text;
-    return translated;
+    return await translateGoogle(text);
   } catch {
-    return text; // falha silenciosa — mantém original
+    try {
+      return await translateMyMemory(text);
+    } catch {
+      return text; // falha silenciosa — mantém original só se os dois falharem
+    }
   }
 }
 
