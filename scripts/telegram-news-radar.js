@@ -157,7 +157,7 @@ async function sendTelegram(text) {
 // horário-alvo + trava de duplicidade no Supabase (garante 1 envio por slot,
 // mesmo que o workflow rode várias vezes dentro da mesma janela).
 const SEND_TARGETS_BRT = ['04:38', '06:38', '08:38', '11:38', '18:38'];
-const TOLERANCE_MIN = 55;
+const TOLERANCE_MIN = 58; // fica abaixo da metade do menor intervalo entre horários-alvo (120min), evitando sobreposição de janelas, e ainda cobre quase toda a folga de 1h do cron da Vercel
 
 function nowInBrasilia() {
   const parts = new Intl.DateTimeFormat('en-CA', {
