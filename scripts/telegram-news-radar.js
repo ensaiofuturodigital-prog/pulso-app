@@ -8,24 +8,20 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ─── BREAKING — palavras que indicam notícia crítica de mercado ───────────────
+// ─── BREAKING — reservado só pra eventos raros e de impacto direto e imediato
+// no mercado (decisão de juros, crash, calote). Termos genéricos como "crise"
+// ou "guerra" foram removidos de propósito — eles aparecem quase todo dia em
+// notícia de macro/geopolítica normal e não são "breaking" de verdade.
 const BREAKING_KEYWORDS = [
   'fed eleva','fed corta','fed mantém','fed sobe','fed reduz',
   'copom eleva','copom corta','copom mantém','copom sobe','copom reduz',
   'selic sobe','selic cai','selic eleva','selic reduz',
-  'bce eleva','bce corta','juros sobem','juros caem',
-  'colapso','crash','crise','default','calote','falência','falencia','quebra',
-  'recessão confirmada','recessao confirmada',
-  'guerra','invasão','invasao','golpe de estado','estado de emergência',
+  'bce eleva','bce corta',
   'circuit breaker','bolsa despenca','bolsa afunda','ibovespa despenca',
   'nasdaq despenca','dow jones despenca',
   'dólar dispara','dolar dispara','dólar rompe','dolar rompe',
-  'petróleo despenca','petroleo despenca','petróleo dispara','petroleo dispara',
-  'ouro dispara','ouro bate recorde',
-  'pib recua','pib contrai','desemprego recorde',
-  'inflação recorde','inflacao recorde',
-  'fusão bilionária','fusao bilionaria','mega fusão','mega fusao',
-  'breaking','urgente','última hora','ultima hora',
+  'calote','default soberano','moratória','moratoria',
+  'recessão confirmada','recessao confirmada',
 ];
 
 function isBreaking(title) {
