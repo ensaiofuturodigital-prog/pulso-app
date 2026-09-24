@@ -137,9 +137,22 @@ async function ingestCalendar(text) {
       if (error) summary.erros.push(`${code} (release_schedule): ${error.message}`);
     }
 
-    // 2) indicator_releases: só grava linha com valor real quando "Actual" veio preenchido
+    // 2) indicator_releases: só grava linha com valor real quando "Actual" veio
+    // preenchido E a data não é futura. Essa segunda trava existe porque o
+    // parser do Investing.com (Layout B) pode confundir "Previsão" com "Atual"
+    // quando o evento ainda não saiu (bug encontrado em 24/09/2026, corrigia
+    // sozinho registros fantasmas de indicadores que ainda não tinham sido
+    // divulgados). Não confia em NENHUM parser pra isso — trava aqui, uma vez
+    // só, pra sempre.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const futurosIgnorados = evs.filter(e => e.actual !== null && e.date > todayStr);
+    if (futurosIgnorados.length > 0) {
+      summary.erros.push(
+        `${code}: ${futurosIgnorados.length} evento(s) com data futura vieram com "Atual" preenchido — ignorado(s) de propósito (provável Previsão lida por engano). Datas: ${futurosIgnorados.map(e => e.date).join(', ')}`
+      );
+    }
     const releaseRows = evs
-      .filter(e => e.actual !== null)
+      .filter(e => e.actual !== null && e.date <= todayStr)
       .map(e => ({
         indicator_id: indicatorId,
         release_date: e.date,
