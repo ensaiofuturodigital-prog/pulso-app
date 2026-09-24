@@ -97,6 +97,7 @@ export function parseCalendarTextInvesting(rawText) {
   const events = [];
   let currentDate = null;
   let i = 0;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   while (i < lines.length) {
     const line = lines[i];
@@ -148,11 +149,21 @@ export function parseCalendarTextInvesting(rawText) {
       }
 
       let actual = null, forecast = null, previous = null;
+      const isFutureEvent = currentDate > todayStr;
       if (valueLines.length === 1) {
         if (valueLines[0].includes('\t')) {
           const parts = valueLines[0].split('\t').map(s => s.trim()).filter(s => s !== '');
-          actual = parts[0] || null;
-          forecast = parts[1] || null;
+          if (isFutureEvent) {
+            // Evento ainda não divulgado: essa linha única é [Previsão, Anterior],
+            // nunca [Atual, Previsão] — não existe "Atual" ainda.
+            forecast = parts[0] || null;
+            previous = parts[1] || null;
+          } else {
+            actual = parts[0] || null;
+            forecast = parts[1] || null;
+          }
+        } else if (isFutureEvent) {
+          previous = valueLines[0].trim() || null;
         } else {
           actual = valueLines[0].trim() || null;
         }
