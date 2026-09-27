@@ -25,7 +25,7 @@
 // igual ao "Dados Históricos" do Investing.com — reaproveita a mesma lógica
 // de parsePrice.js.
 
-const WEEKDAY_RE = /^(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo)(-feira)?,\s*(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})\s*$/i;
+const WEEKDAY_RE = /^(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo)(-feira)?,\s*(\d{1,2})\s+de\s+(\p{L}+)\s+de\s+(\d{4})\s*$/iu;
 const TIME_ONLY_RE = /^(\d{1,2}):(\d{2})$/;
 const TIME_TAB_RE = /^(\d{1,2}):(\d{2})\t/;
 
