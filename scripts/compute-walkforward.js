@@ -7,6 +7,15 @@ import { buildSamples, runWalkForward, summarize } from './lib/walkforward-core.
 // não mexe em indicator_stats/accuracy_log e NÃO envia nada ao Telegram.
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const LOG = [];
+const _log = console.log.bind(console);
+console.log = (...a) => { const t = a.join(' '); LOG.push(t); _log(t); };
+async function flushLog() {
+  try {
+    const rows = LOG.join('\n').split('\n').map((line) => ({ line: line.slice(0, 2000) }));
+    if (rows.length) await supabase.from('wf_log').insert(rows);
+  } catch (e) { _log('log não gravado:', e.message); }
+}
 
 async function fetchAll(table, select, orderCol, filter = (q) => q) {
   let all = [], from = 0;
@@ -56,4 +65,4 @@ async function run() {
   }
   console.log('\nFinalizado. Nada foi apagado e nada foi enviado ao Telegram.');
 }
-run().catch((e) => { console.error('❌ Falha:', e.message); process.exitCode = 1; });
+run().then(flushLog).catch(async (e) => { console.log('❌ Falha: ' + (e && (e.message || JSON.stringify(e))) + ' | ' + (e && e.stack ? e.stack.split('\n')[1] : '')); await flushLog(); process.exitCode = 1; });
