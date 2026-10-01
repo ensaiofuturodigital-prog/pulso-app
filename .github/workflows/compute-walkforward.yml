@@ -1,0 +1,19 @@
+name: Compute Walk-forward (teste cego experimental)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - name: Teste cego (só lê dados e grava em wf_predictions / wf_summary)
+        run: node scripts/compute-walkforward.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
