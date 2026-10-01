@@ -2,6 +2,9 @@ name: Compute Walk-forward (teste cego experimental)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [teste-walkforward]
+    paths: ['.github/workflows/compute-walkforward.yml']
 
 jobs:
   compute:
