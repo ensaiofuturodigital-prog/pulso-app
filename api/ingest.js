@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { parseCalendarText, parseNumericValue } from './lib/parseCalendar.js';
-import { parseCalendarTextInvesting, parseNumberPT, looksLikeInvestingCalendar } from './lib/parseCalendarInvesting.js';
+import { parseNumberPT } from './lib/parseCalendarInvesting.js';
+import { parseCalendarFull } from './lib/parseCalendarInvestingFull.js';
 import { parsePriceText } from './lib/parsePrice.js';
 import { resolveCode } from './lib/indicatorMap.js';
 
@@ -42,6 +42,64 @@ async function triggerRecompute() {
     }
   }
   return { disparado: true, workflows: results };
+}
+
+// Monta o resumo em português (aparece primeiro na tela) e a conferência
+// "tudo que foi lido foi guardado?".
+function finalizar(summary) {
+  const tudoGuardado = summary.guardados_no_historico_completo === summary.eventos_unicos_lidos && summary.erros.length === 0;
+  const naoEntendidas = summary.linhas_nao_entendidas.length;
+  const sem = summary.sem_mapa_resumo ? Object.keys(summary.sem_mapa_resumo).length : 0;
+  const texto = [
+    `Li ${summary.total_lidos_do_texto} eventos do texto.`,
+    `Guardei ${summary.guardados_no_historico_completo} no histórico completo (nada descartado).`,
+    `${summary.mapeados} viraram dados de indicadores do Pulso.`,
+    summary.feriados ? `${summary.feriados} são feriados.` : null,
+    summary.provaveis_placeholders_dia_1 ? `${summary.provaveis_placeholders_dia_1} linhas de dia 1º com mês entre parênteses foram guardadas mas não usadas no modelo.` : null,
+    sem ? `${sem} tipos de evento ainda não têm indicador no Pulso (estão guardados, não perdidos).` : null,
+    naoEntendidas ? `ATENÇÃO: ${naoEntendidas} linha(s) do texto não foram entendidas — veja "linhas_nao_entendidas".` : 'Todas as linhas do texto foram entendidas.',
+    summary.erros.length ? `ATENÇÃO: ${summary.erros.length} erro(s) ao gravar — veja "erros".` : null,
+  ].filter(Boolean).join(' ');
+  return {
+    conferencia: tudoGuardado && !naoEntendidas ? 'OK — tudo o que foi lido foi guardado' : 'ATENÇÃO — confira os avisos abaixo',
+    resumo: texto,
+    ...summary,
+  };
+}
+
+function dedupeBy(arr, keyFn) {
+  const seen = new Set();
+  return arr.filter(x => { const k = keyFn(x); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+// Guarda TODOS os eventos lidos (feriados, discursos, outros países, eventos
+// sem indicador) com o texto original, sem perder nada.
+async function saveAllEvents(events, summary) {
+  const rows = dedupeBy(events.map(e => ({
+    event_date: e.date,
+    event_time: e.time || '',
+    all_day: !!e.allDay,
+    country: e.country || '',
+    event_raw: e.eventRaw,
+    event_name: e.event,
+    period_ref: e.period,
+    is_holiday: e.isHoliday,
+    is_month_start_placeholder: e.isPlaceholder,
+    actual_raw: e.actual, forecast_raw: e.forecast, previous_raw: e.previous,
+    raw_values: e.rawValues || null,
+    actual_value: e.actualValue, forecast_value: e.forecastValue, previous_value: e.previousValue,
+    indicator_code: e.isHoliday ? null : resolveCode(e.event, e.country),
+    source: 'Investing.com',
+    ingested_at: new Date().toISOString(),
+  })), r => `${r.event_date}|${r.event_time}|${r.country}|${r.event_raw}`);
+  summary.eventos_unicos_lidos = rows.length;
+  let saved = 0;
+  for (const batch of chunk(rows, 500)) {
+    const { error } = await supabase.from('calendar_events').upsert(batch, { onConflict: 'event_date,event_time,country,event_raw' });
+    if (error) summary.erros.push(`calendar_events: ${error.message}`);
+    else saved += batch.length;
+  }
+  return saved;
 }
 
 function chunk(arr, size) {
@@ -88,25 +146,43 @@ export default async function handler(req, res) {
     res.status(400).json({ error: "type precisa ser 'calendar' ou 'price'" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 }
 
 async function ingestCalendar(text) {
-  // Detecta sozinho se você colou do Trading Economics (inglês) ou do
-  // Investing.com (português) — adicionado em 21/08/2026. Não precisa mais
-  // escolher: cola de qualquer um dos dois que funciona.
-  const fromInvesting = looksLikeInvestingCalendar(text);
-  const events = fromInvesting ? parseCalendarTextInvesting(text) : parseCalendarText(text);
-  const parseNumber = fromInvesting ? parseNumberPT : parseNumericValue;
-  const summary = { total_eventos: events.length, mapeados: 0, sem_mapa: [], erros: [], fonte: fromInvesting ? 'Investing.com' : 'Trading Economics' };
+  // O Pulso lê APENAS o calendário do Investing.com (em português). O leitor
+  // "guarda tudo": nada é descartado em silêncio.
+  const full = parseCalendarFull(text);
+  if (full.events.length === 0) {
+    const err = new Error('Não consegui ler nenhum evento. Cole a tabela do calendário do Investing.com em português (colunas Hora, Moeda, Evento, Import., Atual, Projeção, Anterior).');
+    err.status = 400;
+    throw err;
+  }
+  // Pro fluxo de indicadores só entram eventos reais: feriados e linhas
+  // "placeholder" (dia 1º com sufixo de mês, que não são a data real de
+  // divulgação) ficam só no histórico completo, sem alimentar o modelo.
+  const events = full.events
+    .filter(e => !e.isHoliday && !e.isPlaceholder)
+    .map(e => ({ ...e, time: e.time ? `${e.time}:00` : null }));
+  const parseNumber = parseNumberPT;
+  const summary = { total_eventos: events.length, mapeados: 0, sem_mapa: [], erros: [], fonte: 'Investing.com' };
+  summary.total_lidos_do_texto = full.events.length;
+  summary.feriados = full.events.filter(e => e.isHoliday).length;
+  summary.provaveis_placeholders_dia_1 = full.events.filter(e => e.isPlaceholder).length;
+  summary.linhas_nao_entendidas = full.ignoradas.slice(0, 50);
+  summary.guardados_no_historico_completo = await saveAllEvents(full.events, summary);
 
   // Descobre o código do indicador pra cada evento e agrupa
   const byCode = {};
   for (const ev of events) {
     const code = resolveCode(ev.event, ev.country);
     if (!code) {
-      summary.sem_mapa.push(`${ev.date} [${ev.country}] ${ev.event}`);
+      // Não é perdido: já está guardado inteiro em calendar_events.
+      const k = `[${ev.country}] ${ev.event}`;
+      summary.sem_mapa_resumo = summary.sem_mapa_resumo || {};
+      summary.sem_mapa_resumo[k] = (summary.sem_mapa_resumo[k] || 0) + 1;
+      if (summary.sem_mapa.length < 100) summary.sem_mapa.push(`${ev.date} ${k}`);
       continue;
     }
     byCode[code] = byCode[code] || [];
@@ -114,7 +190,7 @@ async function ingestCalendar(text) {
   }
 
   const codes = Object.keys(byCode);
-  if (codes.length === 0) return summary;
+  if (codes.length === 0) return finalizar(summary);
 
   const { data: indicators, error: indError } = await supabase
     .from('indicators').select('id, code').in('code', codes);
@@ -131,7 +207,7 @@ async function ingestCalendar(text) {
     const evs = byCode[code];
 
     // 1) release_schedule: data de divulgação (sempre grava, saiu ou não)
-    const scheduleRows = evs.map(e => ({ indicator_id: indicatorId, release_date: e.date }));
+    const scheduleRows = dedupeBy(evs.map(e => ({ indicator_id: indicatorId, release_date: e.date })), r => r.release_date);
     for (const batch of chunk(scheduleRows, 500)) {
       const { error } = await supabase.from('release_schedule').upsert(batch, { onConflict: 'indicator_id,release_date' });
       if (error) summary.erros.push(`${code} (release_schedule): ${error.message}`);
@@ -151,15 +227,25 @@ async function ingestCalendar(text) {
         `${code}: ${futurosIgnorados.length} evento(s) com data futura vieram com "Atual" preenchido — ignorado(s) de propósito (provável Previsão lida por engano). Datas: ${futurosIgnorados.map(e => e.date).join(', ')}`
       );
     }
-    const releaseRows = evs
+    const releaseCandidates = evs
       .filter(e => e.actual !== null && e.date <= todayStr)
       .map(e => ({
         indicator_id: indicatorId,
         release_date: e.date,
         actual_value: parseNumber(e.actual),
         previous_value: parseNumber(e.previous),
+        expected_value: parseNumber(e.forecast), // Previsão (consenso) — antes era descartada
+        release_time: e.time || null,             // horário da divulgação
       }))
       .filter(r => r.actual_value !== null);
+    // Dois eventos do mesmo indicador no mesmo dia (ex.: CPI mensal e anual)
+    // derrubariam o lote inteiro no banco. Fica o primeiro; o outro continua
+    // guardado em calendar_events e é avisado em "conflitos".
+    const releaseRows = dedupeBy(releaseCandidates, r => r.release_date);
+    if (releaseRows.length < releaseCandidates.length) {
+      summary.conflitos = summary.conflitos || [];
+      summary.conflitos.push(`${code}: ${releaseCandidates.length - releaseRows.length} evento(s) no mesmo dia — ficou o primeiro no indicador, os demais estão em calendar_events`);
+    }
 
     if (releaseRows.length > 0) {
       for (const batch of chunk(releaseRows, 500)) {
@@ -167,11 +253,13 @@ async function ingestCalendar(text) {
         if (error) { summary.erros.push(`${code} (indicator_releases): ${error.message}`); continue; }
       }
       // marca fetched_at só nas linhas que acabaram de ganhar valor real agora
+      // (em lotes de 200 datas — antes era 1 chamada por linha e estourava o
+      // tempo da Vercel em colagens grandes)
       const nowIso = new Date().toISOString();
-      for (const r of releaseRows) {
+      for (const dates of chunk(releaseRows.map(r => r.release_date), 200)) {
         await supabase.from('indicator_releases')
           .update({ fetched_at: nowIso })
-          .eq('indicator_id', indicatorId).eq('release_date', r.release_date)
+          .eq('indicator_id', indicatorId).in('release_date', dates)
           .is('fetched_at', null);
       }
     }
@@ -179,7 +267,7 @@ async function ingestCalendar(text) {
     summary.mapeados += evs.length;
   }
 
-  return summary;
+  return finalizar(summary);
 }
 
 async function ingestPriceForAsset(text, asset) {
