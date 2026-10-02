@@ -40,7 +40,7 @@ const CURRENCY_TO_COUNTRY = { USD: 'US', EUR: 'EA', BRL: 'BR' };
 // esses três, que são os que o Pulso rastreia.
 const VALID_COUNTRY_CODES = ['BR', 'US', 'EU', 'EA'];
 
-function parseDayHeaderPT(line) {
+export function parseDayHeaderPT(line) {
   const m = WEEKDAY_RE.exec(line.trim());
   if (!m) return null;
   const [, , , day, monthName, year] = m;
@@ -54,7 +54,7 @@ function parseDayHeaderPT(line) {
 // — de propósito NÃO mexe em "(Mensal)"/"(Anual)"/"(sem Ajuste Sazonal)" etc,
 // porque no Investing.com esses qualificadores mudam qual série é (ex: CPI
 // mensal vs anual são eventos diferentes), diferente do Trading Economics.
-function normalizeEventPT(name) {
+export function normalizeEventPT(name) {
   let out = name.trim();
   // Bug corrigido em 27/08/2026: o Investing.com às vezes mostra o mês em
   // português ("Ago", "Set") e às vezes em inglês ("Aug", "Sep") dependendo
