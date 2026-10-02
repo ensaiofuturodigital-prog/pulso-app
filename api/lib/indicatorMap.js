@@ -67,6 +67,32 @@ export const EVENT_TO_CODE_PT = {
 };
 
 // Casos especiais que dependem do país (mesmo nome de evento, indicador diferente)
+// Nomes do Investing.com em português que o Pulso não reconhecia (histórico
+// colado a partir de 2010). A chave é "PAÍS|nome". Só entram aqui indicadores
+// que JÁ existem no banco e cuja unidade bate com o que é colado. O que não
+// está aqui NÃO é perdido: fica guardado inteiro na tabela calendar_events.
+const NOVOS_PT = {
+  'US|Relatório de Emprego (Payroll) não-agrícola': 'PAYEMS',
+  'US|Taxa de Desemprego nos EUA': 'UNRATE',
+  'US|IPC (Mensal)': 'CPIAUCSL',
+  'US|Vendas no Varejo (Mensal)': 'RSAFS',
+  'US|PIB dos EUA (Trimestral)': 'GDPC1',
+  'US|Taxa-alvo de Fundos Fed': 'DFF',
+  'US|PMI Industrial ISM': 'ISM_US_MFG_PMI',
+  'US|PMI ISM Não-Manufatura': 'ISM_US_SVC_PMI',
+  'US|IPP (Mensal)': 'PPIACO',
+  'US|Ofertas de Emprego JOLTS': 'JTSJOL',
+  'EA|Decisão da Taxa de Juros': 'ECBMRRFR',
+  'EA|Taxa de Facilidade Permanente de Depósito': 'ECBDFR',
+  'BR|IPCA (Mensal)': 'BCB_IPCA',
+  'BR|IPCA-15 (Mensal)': 'BCB_IPCA15',
+  'BR|IGP-M (Mensal)': 'BCB_IGPM',
+  'BR|Taxa de Juros Selic': 'BCB_SELIC',
+  'BR|PIB do Brasil (Anual)': 'BCB_PIB',
+  'BR|Taxa de Desemprego no Brasil': 'BCB_DESEMPREGO',
+  'BR|Balança Comercial': 'BCB_BALANCA',
+};
+
 export function resolveCode(eventName, country) {
   if (eventName === 'Unemployment Rate' && country === 'BR') return 'BCB_DESEMPREGO';
   if (eventName === 'Interest Rate Decision' && country === 'BR') return 'BCB_SELIC';
@@ -94,5 +120,6 @@ export function resolveCode(eventName, country) {
   if (eventName === 'S&P Global Manufacturing PMI') return country === 'US' ? 'SPGI_US_MFG_PMI' : country === 'EA' ? 'SPGI_EU_MFG_PMI' : country === 'BR' ? 'SPGI_BR_MFG_PMI' : null;
   if (eventName === 'S&P Global Services PMI') return country === 'US' ? 'SPGI_US_SVC_PMI' : country === 'EA' ? 'SPGI_EU_SVC_PMI' : country === 'BR' ? 'SPGI_BR_SVC_PMI' : null;
   if (eventName === 'S&P Global Composite PMI') return country === 'US' ? 'SPGI_US_COMP_PMI' : country === 'EA' ? 'SPGI_EU_COMP_PMI' : country === 'BR' ? 'SPGI_BR_COMP_PMI' : null;
+  if (NOVOS_PT[country + '|' + eventName]) return NOVOS_PT[country + '|' + eventName];
   return EVENT_TO_CODE[eventName] || EVENT_TO_CODE_PT[eventName] || null;
 }
