@@ -38,19 +38,19 @@ async function upsert(table, rows, onConflict) {
 
 async function run() {
   const indicators = await fetchAll('indicators', 'id, code', 'id');
-  const rels = await fetchAll('indicator_releases', 'indicator_id, release_date, actual_value, previous_value', 'release_date');
+  const rels = await fetchAll('indicator_releases', 'indicator_id, release_date, actual_value, previous_value, expected_value', 'release_date');
   const ids = indicators.map((i) => i.id);
   const relByDate = {};
   for (const r of rels) {
     if (r.actual_value == null) continue;
-    (relByDate[r.release_date] = relByDate[r.release_date] || []).push({ id: r.indicator_id, actual: Number(r.actual_value), previous: r.previous_value == null ? null : Number(r.previous_value) });
+    (relByDate[r.release_date] = relByDate[r.release_date] || []).push({ id: r.indicator_id, actual: Number(r.actual_value), previous: r.previous_value == null ? null : Number(r.previous_value), expected: r.expected_value == null ? null : Number(r.expected_value) });
   }
   console.log(`Indicadores: ${ids.length} | divulgações com valor: ${rels.filter((r) => r.actual_value != null).length}`);
 
   for (const asset of ['WDO', 'WIN']) {
     const px = (await fetchAll('price_daily', 'price_date, open, close', 'price_date', (q) => q.eq('asset', asset)))
       .map((p) => ({ date: p.price_date, open: Number(p.open), close: Number(p.close) }));
-    for (const variant of ['depois', 'antes']) {
+    for (const variant of ['consenso', 'depois', 'antes']) {
       const { samples, nFeatures } = buildSamples(px, relByDate, ids, variant);
       const preds = runWalkForward(samples, nFeatures);
       const sum = summarize(preds);
@@ -58,8 +58,11 @@ async function run() {
       const alwaysUp = (100 * tot.ups / tot.n).toFixed(1);
       console.log(`\n=== ${asset} / ${variant} === ${tot.n} dias previstos às cegas | acerto ${(100 * tot.hits / tot.n).toFixed(1)}% | (sempre-alta teria ${alwaysUp}%)`);
       for (const s of sum.filter((x) => x.year === 0 && x.bucket !== 'todos')) console.log(`  confiança ${s.bucket}: ${(100 * s.hits / s.n).toFixed(1)}% em ${s.n} dias`);
+      for (const s of sum.filter((x) => x.year === 0 && (x.bucket === 'evento' || x.bucket === 'sem-evento'))) console.log(`  ${s.bucket}: ${(100 * s.hits / s.n).toFixed(1)}% em ${s.n} dias`);
+      const z = ((tot.hits / tot.n - 0.5) * Math.sqrt(tot.n)) / 0.5;
+      console.log(`  força estatística (z contra 50%): ${z.toFixed(2)}  (acima de ~2 já não seria só sorte)`);
       console.log('  por ano: ' + sum.filter((x) => x.year > 0 && x.bucket === 'todos').map((x) => `${x.year}:${(100 * x.hits / x.n).toFixed(0)}%`).join(' '));
-      await upsert('wf_predictions', preds.map((p) => ({ asset, variant, ...p })), 'asset,variant,pred_date');
+      await upsert('wf_predictions', preds.map((p) => ({ asset, variant, pred_date: p.pred_date, p_up: p.p_up, label_up: p.label_up, model_asof: p.model_asof })), 'asset,variant,pred_date');
       await upsert('wf_summary', sum.map((s) => ({ asset, variant, ...s, updated_at: new Date().toISOString() })), 'asset,variant,year,bucket');
     }
   }

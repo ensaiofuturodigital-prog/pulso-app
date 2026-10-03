@@ -10,12 +10,13 @@ const sigmoid = (z) => 1 / (1 + Math.exp(-clip(z, -30, 30)));
 const sgn = (x) => (x > 0 ? 1 : x < 0 ? -1 : 0);
 
 // prices: [{date, open, close}] em ordem. releasesByDate: {data: [{id, actual, previous}]}
-// variant: 'depois' = usa o valor do indicador divulgado no próprio dia (surpresa)
-//          'antes'  = só sabe QUAIS indicadores estão agendados no dia, não o resultado
+// variant: 'consenso' = surpresa de verdade: realizado contra a Projeção (cai pro anterior se não houver Projeção)
+//          'depois'   = surpresa contra o valor anterior
+//          'antes'    = só sabe QUAIS indicadores estão agendados no dia, não o resultado
 export function buildSamples(prices, releasesByDate, indicatorIds, variant) {
   const names = ['bias', 'dow1', 'dow2', 'dow3', 'dow4', 'dow5', 'mom1', 'mom5'];
   indicatorIds.forEach((id) => {
-    if (variant === 'depois') { names.push('s' + id); names.push('x' + id); }
+    if (variant === 'depois' || variant === 'consenso') { names.push('s' + id); names.push('x' + id); }
     else names.push('a' + id);
   });
   const idx = {}; names.forEach((n, i) => { idx[n] = i; });
@@ -33,14 +34,15 @@ export function buildSamples(prices, releasesByDate, indicatorIds, variant) {
     f.push([idx.mom1, mom1], [idx.mom5, mom5]);
     const rel = releasesByDate[p.date] || [];
     for (const r of rel) {
-      if (variant === 'depois') {
-        const s = r.previous == null ? 0 : sgn(r.actual - r.previous);
+      if (variant === 'depois' || variant === 'consenso') {
+        const ref = (variant === 'consenso' && r.expected != null) ? r.expected : r.previous;
+        const s = ref == null ? 0 : sgn(r.actual - ref);
         if (s !== 0) { f.push([idx['s' + r.id], s]); f.push([idx['x' + r.id], s * sgn(mom5)]); }
       } else {
         f.push([idx['a' + r.id], 1]);
       }
     }
-    samples.push({ date: p.date, y: p.close > p.open ? 1 : 0, f });
+    samples.push({ date: p.date, y: p.close > p.open ? 1 : 0, f, ev: rel.length > 0 });
   }
   return { samples, nFeatures: names.length, names };
 }
@@ -87,7 +89,7 @@ export function runWalkForward(samples, nFeatures, { startDate = '2013-01-01', w
     train(model, past, monthStart, { ...opt, epochs: trained ? monthEpochs : warmEpochs });
     trained = true;
     for (const s of samples) if (s.date.slice(0, 7) === m) {
-      preds.push({ pred_date: s.date, p_up: predict(model, s.f), label_up: s.y === 1, model_asof: monthStart });
+      preds.push({ pred_date: s.date, p_up: predict(model, s.f), label_up: s.y === 1, model_asof: monthStart, ev: s.ev });
     }
   }
   return preds;
@@ -105,6 +107,7 @@ export function summarize(preds) {
   for (const p of preds) {
     const y = Number(p.pred_date.slice(0, 4)); const b = bucketOf(p.p_up);
     add(y, 'todos', p); add(y, b, p); add(0, 'todos', p); add(0, b, p);
+    const t = p.ev ? 'evento' : 'sem-evento'; add(y, t, p); add(0, t, p);
   }
   return Object.values(acc).sort((a, b) => a.year - b.year || a.bucket.localeCompare(b.bucket));
 }
