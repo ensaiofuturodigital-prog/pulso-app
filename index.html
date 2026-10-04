@@ -54,6 +54,10 @@
         <svg viewBox="0 0 24 24"><path d="M4 19V10M12 19V5M20 19V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Painel de Indicadores</span>
       </button>
+      <button class="tab-btn" data-tab="pulso2">
+        <svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        <span>Pulso 2 · Sinais</span>
+      </button>
       <button class="tab-btn" data-tab="calendario">
         <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3.5 9.5H20.5M8 3V6M16 3V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Calendário Econômico</span>
@@ -99,6 +103,15 @@
         <div class="timeline" id="dailySummaryItems" style="display:none"></div>
 
         <p class="panel-disclaimer">Estimativas estatísticas baseadas em dados históricos. Não constituem recomendação de investimento — apenas contexto pra sua própria análise.</p>
+      </section>
+
+      <!-- PULSO 2 (aba nova: sinais e amplitude por dia útil) -->
+      <section class="panel" id="panel-pulso2">
+        <div class="panel-head">
+          <h1>Pulso 2 · Sinais</h1>
+          <p>Probabilidade e movimento esperado para cada dia útil. Aba independente: o Painel de Indicadores continua igual.</p>
+        </div>
+        <div id="pulso2Root"><div class="skeleton-row"></div></div>
       </section>
 
       <!-- CALENDARIO -->
@@ -185,6 +198,7 @@
 </div>
 
 <script type="module" src="app.js"></script>
+<script type="module" src="pulso2.js"></script>
 </body>
 </html>
 

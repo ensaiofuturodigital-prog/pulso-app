@@ -1,0 +1,19 @@
+name: Pulso2 conferência (só leitura)
+on:
+  push:
+    branches: [aba-pulso2]
+    paths: ['scripts/pulso2-check.js', 'api/lib/pulso2-engine.js', 'api/lib/pulso2-data.js', '.github/workflows/pulso2-check.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - name: Conferir o motor com os dados reais (só lê; grava o relatório em wf_log)
+        run: node scripts/pulso2-check.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
