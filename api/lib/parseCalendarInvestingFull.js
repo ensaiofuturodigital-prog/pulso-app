@@ -13,6 +13,13 @@ const CURRENCY_TO_COUNTRY = { USD: 'US', EUR: 'EA', BRL: 'BR' };
 const HEADER_WORDS = new Set(['hora', 'moeda', 'evento', 'import.', 'imp.', 'atual', 'projeção', 'projecao', 'previsão', 'anterior', 'tempo', 'moe.']);
 const PERIOD_RE = /\s+\((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Fev|Abr|Mai|Ago|Set|Out|Dez|Q[1-4])\)\s*$/i;
 
+// "Agora" no horário de Brasília (o calendário colado e o pregão são em Brasília).
+function brtNow(now) {
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now);
+  const hm = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+  return { date, hm };
+}
+
 function normalizeCountry(raw) {
   const c = (raw || '').trim().toUpperCase();
   if (CURRENCY_TO_COUNTRY[c]) return CURRENCY_TO_COUNTRY[c];
@@ -43,7 +50,7 @@ function buildEvent({ date, time, allDay, country, nameRaw, actual, forecast, pr
 export function parseCalendarFull(rawText, now = new Date()) {
   const lines = rawText.split('\n').map((l) => l.replace(/\r$/, ''));
   const events = [], ignoradas = [];
-  const todayStr = now.toISOString().slice(0, 10);
+  const { date: todayStr, hm: nowHM } = brtNow(now);
   let date = null, i = 0;
 
   while (i < lines.length) {
@@ -88,11 +95,13 @@ export function parseCalendarFull(rawText, now = new Date()) {
     }
 
     let actual = null, forecast = null, previous = null, isHoliday = false;
-    const future = date > todayStr;
+    // Futuro = data depois de hoje, ou hoje com horário que ainda não chegou (no futuro o 1º número é a PROJEÇÃO, não o resultado).
+    const future = date > todayStr || (date === todayStr && !!time && time > nowHM);
     if (values.length && /^feriado\b/i.test(values[0].trim())) isHoliday = true;
     else if (values.length >= 2) {
       const c = values[0].split('\t').map((s) => s.trim());
-      actual = c[0] || null; forecast = c[1] || null;
+      if (future) { forecast = c[0] || null; } // evento que ainda não saiu: 1º número = Projeção
+      else { actual = c[0] || null; forecast = c[1] || null; }
       previous = values[1].split('\t')[0].trim() || null;
     } else if (values.length === 1) {
       const c = values[0].split('\t').map((s) => s.trim());
