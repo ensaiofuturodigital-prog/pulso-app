@@ -220,7 +220,8 @@ async function ingestCalendar(text) {
     // sozinho registros fantasmas de indicadores que ainda não tinham sido
     // divulgados). Não confia em NENHUM parser pra isso — trava aqui, uma vez
     // só, pra sempre.
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // data de hoje em Brasília (antes era UTC: depois das 21h contava "amanhã" como hoje)
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
     const futurosIgnorados = evs.filter(e => e.actual !== null && e.date > todayStr);
     if (futurosIgnorados.length > 0) {
       summary.erros.push(
