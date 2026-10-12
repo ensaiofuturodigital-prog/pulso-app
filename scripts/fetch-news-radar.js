@@ -1,3 +1,4 @@
+import { archiveAndPrune } from './lib/news-archive.js';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
 
@@ -183,10 +184,10 @@ async function run() {
     console.log(`✅ ${rows.length} salvas no banco em português.`);
   }
 
-  // Limpeza 48h
+  // Painel guarda 48h; antes de sair do painel, a notícia é ARQUIVADA em news_archive (nada se perde).
   const cutoff = new Date(Date.now() - 48 * 3600000).toISOString();
-  await supabase.from('news').delete().eq('region', 'radar').lt('published_at', cutoff);
-  console.log('🧹 Limpeza 48h ok.');
+  const r = await archiveAndPrune(supabase, cutoff);
+  console.log(`🗄️ Arquivadas ${r.archived} notícias; ${r.removed} saíram do painel (mais de 48h).`);
 }
 
 run().catch(err => { console.error('❌', err.message); process.exitCode = 1; });

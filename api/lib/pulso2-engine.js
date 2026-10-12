@@ -70,17 +70,20 @@ const quantile = (sorted, q) => { const p = (sorted.length - 1) * q, lo = Math.f
 
 /* ---------------- sinais de direção (só preço) ---------------- */
 // bars: [{d, o, h, l, c}] em ordem crescente. Features para prever o dia i usando só barras < i.
-export function featuresFor(bars, i) {
+export function featuresFor(bars, i, aux) {
   if (i < 25) return null;
   const c = (k) => bars[k].c;
   const win = []; for (let k = i - 20; k <= i - 1; k++) win.push(c(k));
   const s = sd(win);
   const up = (k) => bars[k].c > bars[k].o;
-  return {
+  const f = {
     z20: s > 0 ? (c(i - 1) - mean(win)) / s : 0,
     s3: (up(i - 1) ? 1 : 0) + (up(i - 2) ? 1 : 0) + (up(i - 3) ? 1 : 0),
     mom5: c(i - 1) / c(i - 5) - 1,
   };
+  // Dado do OUTRO ativo, mas só da véspera (nunca do mesmo dia): quanto o dólar se mexeu dentro do pregão anterior.
+  if (aux && aux.partner) { const pb = aux.partner[bars[i - 1].d]; f.w_intra = pb ? pb.c / pb.o - 1 : null; }
+  return f;
 }
 
 export const RULES = [
@@ -90,26 +93,28 @@ export const RULES = [
   { id: 'tres_altas', txt: '3 dias seguidos de alta', test: (f) => f.s3 === 3 },
   { id: 'queda_5d', txt: 'Caiu mais de 2% em 5 dias', test: (f) => f.mom5 < -0.02 },
   { id: 'alta_5d', txt: 'Subiu mais de 2% em 5 dias', test: (f) => f.mom5 > 0.02 },
+  { id: 'dolar_subiu_dia', txt: 'O dólar subiu mais de 0,5% dentro do pregão anterior', only: 'WIN', test: (f) => f.w_intra != null && f.w_intra > 0.005 },
   { id: 'gap_queda', txt: 'Abriu em queda de mais de 0,3%', test: (f) => f.gap < -0.003, needsOpen: true },
   { id: 'gap_alta', txt: 'Abriu em alta de mais de 0,3%', test: (f) => f.gap > 0.003, needsOpen: true },
 ];
 
 const START = '2012-01-01', SPLIT = '2020-01-01';
 
-export function ruleStats(bars) {
-  const acc = {}; for (const r of RULES) acc[r.id] = { n: 0, up: 0, n1: 0, up1: 0, n2: 0, up2: 0 };
+export function ruleStats(bars, aux, asset) {
+  const rules = RULES.filter((r) => !r.only || r.only === asset);
+  const acc = {}; for (const r of rules) acc[r.id] = { n: 0, up: 0, n1: 0, up1: 0, n2: 0, up2: 0 };
   for (let i = 25; i < bars.length; i++) {
     const b = bars[i]; if (b.d < START || b.c === b.o) continue;
-    const f = featuresFor(bars, i); if (!f) continue;
+    const f = featuresFor(bars, i, aux); if (!f) continue;
     f.gap = b.o / bars[i - 1].c - 1; if (Math.abs(f.gap) >= 0.03) continue;
     const y = b.c > b.o ? 1 : 0;
-    for (const r of RULES) if (r.test(f)) {
+    for (const r of rules) if (r.test(f)) {
       const a = acc[r.id]; a.n++; a.up += y;
       if (b.d < SPLIT) { a.n1++; a.up1 += y; } else { a.n2++; a.up2 += y; }
     }
   }
   const out = {};
-  for (const r of RULES) {
+  for (const r of rules) {
     const a = acc[r.id]; const p = a.n ? a.up / a.n : 0.5;
     const p1 = a.n1 ? a.up1 / a.n1 : 0.5, p2 = a.n2 ? a.up2 / a.n2 : 0.5;
     const z = a.n ? (p - 0.5) / Math.sqrt(0.25 / a.n) : 0;
@@ -121,15 +126,16 @@ export function ruleStats(bars) {
   return out;
 }
 
-export function activeSignals(bars, stats, extra = {}) {
+export function activeSignals(bars, stats, extra = {}, aux, asset) {
   // bars: até o último fechamento disponível (prevê o dia seguinte)
-  const f = featuresFor(bars, bars.length); // índice virtual = dia a prever
+  const f = featuresFor(bars, bars.length, aux); // índice virtual = dia a prever
   const out = [];
   if (!f) return out;
   Object.assign(f, extra);
   for (const r of RULES) {
+    if (r.only && r.only !== asset) continue;
     if (r.needsOpen && f.gap === undefined) continue;
-    if (r.test(f)) out.push(stats[r.id]);
+    if (r.test(f) && stats[r.id]) out.push(stats[r.id]);
   }
   return out;
 }
@@ -142,6 +148,98 @@ export function combine(signals) {
 }
 
 export const labelFor = (p) => (p >= 0.52 ? 'Leve viés de alta' : p <= 0.48 ? 'Leve viés de baixa' : 'Sem vantagem estatística');
+
+/* ---------------- troca de contrato (série contínua sem ajuste) ---------------- */
+// WDO: o contrato muda no 1º pregão do mês. WIN: muda logo depois do vencimento
+// (quarta-feira mais próxima do dia 15 dos meses pares). Nesses dias a abertura
+// "salta" por causa do custo de carregamento, e isso NÃO é movimento de mercado.
+export const WIN_ROLL_OFFSET = 1; // nº de pregões depois do vencimento
+export function winExpiry(y, m) {
+  const d = new Date(Date.UTC(y, m - 1, 15, 12)); const w = d.getUTCDay();
+  let off = (3 - w + 7) % 7; if (off > 3) off -= 7;
+  d.setUTCDate(15 + off); return ymd(d);
+}
+export function isRollDate(asset, dateS, extra = {}) {
+  if (asset === 'WDO') return prevBusinessDay(dateS, extra).slice(0, 7) !== dateS.slice(0, 7);
+  if (asset === 'WIN') {
+    const [y, m] = [Number(dateS.slice(0, 4)), Number(dateS.slice(5, 7))];
+    if (m % 2) return false;
+    return nextBusinessDays(winExpiry(y, m), WIN_ROLL_OFFSET, extra, false)[WIN_ROLL_OFFSET - 1] === dateS;
+  }
+  return false;
+}
+export function rollDays(asset, bars) {
+  const s = new Set();
+  if (asset === 'WDO') { let last = ''; for (const b of bars) { const m = b.d.slice(0, 7); if (m !== last) { s.add(b.d); last = m; } } }
+  if (asset === 'WIN') {
+    const years = [...new Set(bars.map((b) => b.d.slice(0, 4)))];
+    for (const y of years) for (const m of [2, 4, 6, 8, 10, 12]) {
+      const exp = winExpiry(Number(y), m);
+      const k = bars.findIndex((b) => b.d > exp);
+      if (k >= 0 && k + WIN_ROLL_OFFSET - 1 < bars.length) s.add(bars[k + WIN_ROLL_OFFSET - 1].d);
+    }
+  }
+  return s;
+}
+// Ajuste "em razão": tira o salto da troca de contrato (a abertura do dia da troca passa a coincidir
+// com o fechamento anterior). Multiplica só as barras ANTERIORES, então não usa nada do futuro.
+export function adjustBars(bars, roll) {
+  const out = new Array(bars.length); let cum = 1;
+  for (let i = bars.length - 1; i >= 0; i--) {
+    const b = bars[i];
+    out[i] = { d: b.d, o: b.o * cum, h: b.h * cum, l: b.l * cum, c: b.c * cum };
+    if (roll.has(b.d) && i > 0) { const f = b.o / bars[i - 1].c; if (f > 0.5 && f < 2) cum *= f; }
+  }
+  return out;
+}
+
+/* ---------------- placar honesto (teste cego do próprio Pulso 2) ---------------- */
+// A cada ano, escolhe as regras estáveis usando SÓ os anos anteriores e prevê o ano seguinte.
+export function blindBacktest(bars, aux, asset, { from = 2016, withOpen = false } = {}) {
+  const years = [...new Set(bars.map((b) => Number(b.d.slice(0, 4))))].filter((y) => y >= from);
+  const byYear = []; let n = 0, hits = 0, ups = 0, total = 0;
+  for (const Y of years) {
+    const start = bars.findIndex((b) => b.d >= `${Y}-01-01`);
+    if (start < 0) continue;
+    const stats = ruleStats(bars.slice(0, start), aux, asset);
+    let yn = 0, yh = 0, yu = 0, yt = 0;
+    for (let i = start; i < bars.length && bars[i].d < `${Y + 1}-01-01`; i++) {
+      const b = bars[i]; if (b.c === b.o) continue;
+      const f = featuresFor(bars, i, aux); if (!f) continue;
+      if (withOpen) { f.gap = b.o / bars[i - 1].c - 1; if (Math.abs(f.gap) >= 0.03) f.gap = 0; }
+      yt++;
+      const sig = [];
+      for (const r of RULES) {
+        if (r.only && r.only !== asset) continue;
+        if (r.needsOpen && !withOpen) continue;
+        if (r.test(f) && stats[r.id]) sig.push(stats[r.id]);
+      }
+      const c = combine(sig); if (!c.used.length || Math.abs(c.p_up - 0.5) < 0.005) continue;
+      const y = b.c > b.o; yn++; yu += y ? 1 : 0; yh += ((c.p_up >= 0.5) === y) ? 1 : 0;
+    }
+    byYear.push({ y: Y, n: yn, hits: yh, days: yt }); n += yn; hits += yh; ups += yu; total += yt;
+  }
+  return { n, hits, acc: n ? hits / n : null, base_up: n ? ups / n : null, days: total, coverage: total ? n / total : 0, z: n ? ((hits / n - 0.5) / Math.sqrt(0.25 / n)) : 0, by_year: byYear };
+}
+
+export function amplitudeBlind(bars, { from = 2016 } = {}) {
+  const years = [...new Set(bars.map((b) => Number(b.d.slice(0, 4))))].filter((y) => y >= from);
+  const rng = bars.map((b) => (b.h - b.l) / b.o);
+  const P = [], A = []; let inBand = 0;
+  for (const Y of years) {
+    const start = bars.findIndex((b) => b.d >= `${Y}-01-01`); if (start < 0) continue;
+    const m = amplitudeModel(bars.slice(0, start));
+    for (let i = start; i < bars.length && bars[i].d < `${Y + 1}-01-01`; i++) {
+      if (!(rng[i] > 0)) continue;
+      const pred = m.a + m.b * mean(rng.slice(i - 5, i));
+      P.push(pred); A.push(rng[i]);
+      if (rng[i] >= pred * m.q25 && rng[i] <= pred * m.q75) inBand++;
+    }
+  }
+  const mp = mean(P), ma = mean(A); let sxy = 0, sxx = 0, syy = 0;
+  for (let k = 0; k < P.length; k++) { sxy += (P[k] - mp) * (A[k] - ma); sxx += (P[k] - mp) ** 2; syy += (A[k] - ma) ** 2; }
+  return { n: P.length, in_band: P.length ? inBand / P.length : null, corr: sxy / Math.sqrt(sxx * syy) };
+}
 
 /* ---------------- amplitude (tamanho do movimento) ---------------- */
 export function amplitudeModel(bars) {
@@ -212,10 +310,15 @@ export function buildForecast({ today, barsByAsset, events, releases, liveRows =
   const startFrom = isBusinessDay(today, extraHol) && !todayHasBar ? today : addDays(today, 1);
   const days = nextBusinessDays(startFrom, horizon, extraHol, true);
 
+  // Série ajustada para troca de contrato (só nos cálculos de gap/média/tendência); os preços reais seguem em barsByAsset.
+  const rolls = {}, bars = {}, aux = {};
+  for (const a of Object.keys(barsByAsset)) { rolls[a] = rollDays(a, barsByAsset[a]); bars[a] = adjustBars(barsByAsset[a], rolls[a]); }
+  const wdoByDate = {}; for (const b of (barsByAsset.WDO || [])) wdoByDate[b.d] = b;
+  aux.WIN = { partner: wdoByDate }; // o WIN usa o que o dólar fez na véspera
+
   const models = {};
   for (const a of Object.keys(barsByAsset)) {
-    const bars = barsByAsset[a];
-    models[a] = { stats: ruleStats(bars), amp: amplitudeModel(bars), us: usScenarioStats(releases, bars) };
+    models[a] = { stats: ruleStats(bars[a], aux[a], a), amp: amplitudeModel(bars[a]), us: usScenarioStats(releases, barsByAsset[a]) };
   }
 
   const eventsByDate = {};
@@ -247,7 +350,7 @@ export function buildForecast({ today, barsByAsset, events, releases, liveRows =
       const m = models[a];
       let p = 0.5, used = [], all = [];
       if (d === first && !out.stale[a]) {
-        all = activeSignals(barsByAsset[a], m.stats);
+        all = activeSignals(bars[a], m.stats, {}, aux[a], a);
         const c = combine(all); p = c.p_up; used = c.used;
       }
       day.assets[a] = {
@@ -265,7 +368,7 @@ export function buildForecast({ today, barsByAsset, events, releases, liveRows =
   out.gap_rules = {};
   for (const a of Object.keys(barsByAsset)) {
     const s = models[a].stats;
-    out.gap_rules[a] = { last_close: barsByAsset[a][barsByAsset[a].length - 1]?.c, queda: s.gap_queda, alta: s.gap_alta,
+    out.gap_rules[a] = { last_close: barsByAsset[a][barsByAsset[a].length - 1]?.c, roll_day: isRollDate(a, first, extraHol), queda: s.gap_queda, alta: s.gap_alta,
       base_edges: (out.days[0]?.assets[a].signals || []).filter((x) => x.stable).map((x) => x.edge) };
   }
 
@@ -279,6 +382,23 @@ export function buildForecast({ today, barsByAsset, events, releases, liveRows =
   }).sort((x, y) => y.date.localeCompare(x.date));
   const scored = rows.filter((r) => r.hit !== null && r.directional);
   out.live = { rows: rows.slice(0, 30), n_scored: scored.length, hits: scored.filter((r) => r.hit).length };
+
+  // placar honesto + qualidade dos dados
+  out.scoreboard = { from: 2016, direction: {}, amplitude: {} };
+  out.data_quality = {};
+  for (const a of Object.keys(barsByAsset)) {
+    out.scoreboard.direction[a] = {
+      pre: blindBacktest(bars[a], aux[a], a, { withOpen: false }),
+      open: blindBacktest(bars[a], aux[a], a, { withOpen: true }),
+    };
+    out.scoreboard.amplitude[a] = amplitudeBlind(bars[a]);
+    const raw = barsByAsset[a]; let rs = 0, rn = 0, os = 0, on = 0;
+    for (let i = 1; i < raw.length; i++) {
+      const g = raw[i].o / raw[i - 1].c - 1; if (!(Math.abs(g) < 0.2)) continue;
+      if (rolls[a].has(raw[i].d)) { rs += g; rn++; } else { os += g; on++; }
+    }
+    out.data_quality[a] = { roll_days: rn, roll_mean_gap: rn ? rs / rn : null, other_mean_gap: on ? os / on : null };
+  }
 
   out.models = Object.fromEntries(Object.keys(models).map((a) => [a, { amp_corr: models[a].amp.corr, last5_pct: models[a].amp.last5, last20_pct: models[a].amp.last20 }]));
   return out;
