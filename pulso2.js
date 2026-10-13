@@ -60,7 +60,9 @@ function assetBlock(asset, a, day, data, isToday) {
     : (day.is_first && !a.reason ? '<div class="p2-sig">Nenhum sinal estatístico ativo para este pregão.</div>' : '');
   const why = amp.why.length ? ` <small>(inclui: ${esc(amp.why.join(', '))})</small>` : '';
   let gap = '';
-  if (isToday && data.gap_rules[asset]?.last_close) {
+  if (isToday && data.gap_rules[asset]?.roll_day) {
+    gap = `<div class="p2-box">Hoje é <b>dia de troca de contrato</b> no ${asset}: a abertura tem um salto que não é movimento de mercado, então a regra do gap não vale hoje.</div>`;
+  } else if (isToday && data.gap_rules[asset]?.last_close) {
     gap = `<div class="p2-open">Abertura de hoje (${asset}): <input type="number" step="0.5" inputmode="decimal" id="${id}-open" placeholder="ex.: ${num(data.gap_rules[asset].last_close)}"> <span id="${id}-gap"></span></div>`;
   }
   let scen = '';
@@ -83,6 +85,23 @@ function eventsBlock(events) {
     const real = e.actual_raw ? ` · <b>Atual ${esc(e.actual_raw)}</b>` : '';
     return `<div class="p2-ev">${hora} ${FLAG[e.country] || esc(e.country)} ${esc(e.event_name)}${per}<br><small>${proj}${ant}${real}</small></div>`;
   }).join('')}</div>`;
+}
+
+function scoreboardBlock(data) {
+  const sb = data.scoreboard; if (!sb) return '';
+  const modos = [['pre', 'Antes da abertura'], ['open', 'Com a abertura (gap)']];
+  const linhas = [];
+  for (const a of ['WDO', 'WIN']) for (const [k, nome] of modos) {
+    const r = sb.direction[a][k];
+    linhas.push(`<tr><td>${a}</td><td>${nome}</td><td>${r.n ? `${r.n} (${pct(r.coverage)} dos dias)` : 'nenhuma'}</td><td>${r.acc == null ? '—' : pct(r.acc, 1)}</td><td>${r.base_up == null ? '—' : pct(r.base_up, 1)}</td><td>${r.n ? r.z.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td></tr>`);
+  }
+  const am = sb.amplitude;
+  const q = data.data_quality || {};
+  const qtxt = Object.entries(q).filter(([, v]) => v.roll_mean_gap != null).map(([a, v]) => `${a}: abertura média ${(100 * v.roll_mean_gap).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% nos ${v.roll_days} dias de troca (contra ${(100 * v.other_mean_gap).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% nos demais)`).join(' · ');
+  return `<h2 style="margin:22px 0 8px;font-family:var(--font-display);font-size:18px">Placar honesto (teste cego ${sb.from}–hoje)</h2>
+    <div class="p2-note">A cada ano, o Pulso 2 escolhe as regras <b>usando só os anos anteriores</b> e prevê o ano seguinte, sem olhar o resultado. Só entram os dias em que há sinal estável; nos outros, ele não aposta. "Sempre alta" é o quanto se acertaria apostando em alta nesses mesmos dias, e a <b>força estatística acima de 2</b> indica algo além do acaso. Quando "Acerto" e "Sempre alta" são iguais, é porque o Pulso 2 só apostou em alta nesses dias.<br><small>Limite: a lista de regras e os limites (0,3%, 0,5%, 2 desvios) foram definidos olhando o histórico todo. Por isso a prova de verdade é o registro ao vivo, abaixo.</small></div>
+    <table class="p2-tbl"><thead><tr><th>Ativo</th><th>Momento</th><th>Previsões com sinal</th><th>Acerto</th><th>Sempre alta</th><th>Força</th></tr></thead><tbody>${linhas.join('')}</tbody></table>
+    <div class="p2-note" style="margin-top:12px"><b>Movimento esperado:</b> a faixa típica deveria conter metade dos dias. No teste cego, a do WDO conteve ${pct(am.WDO.in_band, 0)} (correlação ${am.WDO.corr.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}) e a do WIN ${pct(am.WIN.in_band, 0)} (correlação ${am.WIN.corr.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}).${qtxt ? `<br><small>Preços ajustados para a troca de contrato — ${esc(qtxt)}.</small>` : ''}</div>`;
 }
 
 function render(data) {
@@ -108,6 +127,8 @@ function render(data) {
   if (data.skipped.length) {
     html += `<details class="p2-skip"><summary>Dias sem pregão no período (não mostrados)</summary>${data.skipped.map((s) => `${DOW[new Date(s.date + 'T12:00:00Z').getUTCDay()]} ${short(s.date)} — ${esc(s.why)}`).join('<br>')}</details>`;
   }
+
+  html += scoreboardBlock(data);
 
   // registro ao vivo
   const live = data.live;
