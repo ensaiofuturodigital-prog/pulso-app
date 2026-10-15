@@ -29,15 +29,15 @@ async function dispatch(workflowFile, inputs) {
 }
 
 export default async function handler(req, res) {
-  // Vercel Cron chama com header 'authorization: Bearer <CRON_SECRET>' automaticamente
-  // quando CRON_SECRET está configurado nas env vars do projeto.
-  const authHeader = req.headers['authorization'];
+  // Só aceita chamadas autenticadas com o CRON_SECRET (Vercel envia
+  // automaticamente 'authorization: Bearer <CRON_SECRET>' nos Cron Jobs).
+  // Antes, o cabeçalho 'x-vercel-cron' e o '?secret=' na URL também
+  // liberavam o disparo, e ambos podiam ser falsificados por qualquer um.
   const cronSecret = process.env.CRON_SECRET;
-  const isVercelCron = req.headers['x-vercel-cron']
-    || (cronSecret && authHeader === `Bearer ${cronSecret}`)
-    || (cronSecret && req.query.secret === cronSecret);
+  const authHeader = req.headers['authorization'];
+  const autorizado = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
 
-  if (!isVercelCron) {
+  if (!autorizado) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 

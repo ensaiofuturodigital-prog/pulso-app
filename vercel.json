@@ -28,6 +28,10 @@
     {
       "path": "/api/cron-trigger?job=prob",
       "schedule": "7 9 * * 1-5"
+    },
+    {
+      "path": "/api/pulso2",
+      "schedule": "30 21 * * 1-5"
     }
   ],
   "functions": {
