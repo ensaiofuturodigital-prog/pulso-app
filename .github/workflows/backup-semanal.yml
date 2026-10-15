@@ -1,0 +1,30 @@
+name: Backup semanal (Supabase)
+
+# Roda todo domingo, 06:00 de Brasília (09:00 UTC). Também pode ser disparado
+# na mão: aba Actions > "Backup semanal (Supabase)" > Run workflow.
+on:
+  schedule:
+    - cron: '0 9 * * 0'
+  workflow_dispatch:
+  push:            # TESTE TEMPORÁRIO - remover antes de mesclar
+    branches: [backup-semanal-20261015]
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Baixa as tabelas principais do Supabase
+        run: node scripts/backup-semanal.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      - name: Guarda o backup como artefato (30 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-supabase-${{ github.run_id }}
+          path: backup-out/
+          retention-days: 30
