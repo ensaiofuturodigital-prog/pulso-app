@@ -25,6 +25,23 @@ const TABELAS = [
 const PAGINA = 1000;
 const OUT = path.resolve('backup-out');
 
+// Pergunta ao Supabase quantas linhas a tabela tem de fato (Content-Range).
+async function contarTabela(tabela) {
+  const res = await fetch(`${URL_BASE}/rest/v1/${tabela}?select=*`, {
+    headers: {
+      apikey: KEY,
+      Authorization: `Bearer ${KEY}`,
+      Prefer: 'count=exact',
+      Range: '0-0',
+      'Range-Unit': 'items',
+    },
+  });
+  const cr = res.headers.get('content-range') || '';
+  const total = parseInt(cr.split('/')[1], 10);
+  if (Number.isNaN(total)) throw new Error(`${tabela}: não consegui contar (${cr})`);
+  return total;
+}
+
 async function baixarTabela(tabela) {
   const linhas = [];
   for (let inicio = 0; ; inicio += PAGINA) {
@@ -54,10 +71,14 @@ async function run() {
 
   for (const t of TABELAS) {
     try {
+      const total = await contarTabela(t);
       const linhas = await baixarTabela(t);
+      if (linhas.length !== total) {
+        throw new Error(`${t}: baixei ${linhas.length} linhas, mas o banco tem ${total}`);
+      }
       fs.writeFileSync(path.join(OUT, `${t}.json`), JSON.stringify(linhas));
-      manifesto.tabelas[t] = linhas.length;
-      console.log(`✅ ${t}: ${linhas.length} linhas`);
+      manifesto.tabelas[t] = { linhas: linhas.length, total_no_banco: total };
+      console.log(`✅ ${t}: ${linhas.length} de ${total} linhas conferidas`);
     } catch (err) {
       manifesto.erros.push(err.message);
       console.error(`❌ ${err.message}`);
