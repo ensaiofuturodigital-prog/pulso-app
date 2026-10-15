@@ -6,8 +6,6 @@ on:
   schedule:
     - cron: '0 9 * * 0'
   workflow_dispatch:
-  push:            # TESTE TEMPORÁRIO - remover antes de mesclar
-    branches: [backup-semanal-20261015]
 
 jobs:
   backup:
