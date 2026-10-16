@@ -52,11 +52,11 @@
     <nav class="tabs" aria-label="Seções">
       <button class="tab-btn is-active" data-tab="painel">
         <svg viewBox="0 0 24 24"><path d="M4 19V10M12 19V5M20 19V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <span>Painel de Indicadores</span>
+        <span>O Pulso do Mercado</span>
       </button>
       <button class="tab-btn" data-tab="pulso2">
         <svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-        <span>Pulso 2 · Sinais</span>
+        <span>O Pulso mais Profundo</span>
       </button>
       <button class="tab-btn" data-tab="calendario">
         <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3.5 9.5H20.5M8 3V6M16 3V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -82,7 +82,7 @@
       <!-- PAINEL -->
       <section class="panel is-active" id="panel-painel">
         <div class="panel-head">
-          <h1>Painel do dia</h1>
+          <h1>Pulso do dia</h1>
         </div>
 
         <details class="daily-summary" id="dailySummary" open>
@@ -108,8 +108,8 @@
       <!-- PULSO 2 (aba nova: sinais e amplitude por dia útil) -->
       <section class="panel" id="panel-pulso2">
         <div class="panel-head">
-          <h1>Pulso 2 · Sinais</h1>
-          <p>Probabilidade e movimento esperado para cada dia útil. Aba independente: o Painel de Indicadores continua igual.</p>
+          <h1>O Pulso mais Profundo</h1>
+          <p>Probabilidade e movimento esperado para cada dia útil. Aba independente: o Pulso do Mercado continua igual.</p>
         </div>
         <div id="pulso2Root"><div class="skeleton-row"></div></div>
       </section>
@@ -150,7 +150,7 @@
         <div class="panel-head">
           <h1>Placar</h1>
           <p>Compara toda previsão que o Pulso já mostrou com o que realmente aconteceu no fechamento.</p>
-          <p class="placar-note">Atenção: essas estatísticas usam o histórico inteiro, inclusive os dias que elas tentam prever — por isso tendem a parecer melhores do que a realidade. A prova mais confiável é o registro ao vivo da aba Pulso 2 · Sinais, que só conta previsões travadas antes do pregão acontecer.</p>
+          <p class="placar-note">Atenção: essas estatísticas usam o histórico inteiro, inclusive os dias que elas tentam prever — por isso tendem a parecer melhores do que a realidade. A prova mais confiável é o registro ao vivo da aba O Pulso mais Profundo, que só conta previsões travadas antes do pregão acontecer.</p>
         </div>
         <div class="placar-card" id="placarSummary">
           <div class="skeleton-row"></div>

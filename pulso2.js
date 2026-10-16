@@ -99,7 +99,7 @@ function scoreboardBlock(data) {
   const q = data.data_quality || {};
   const qtxt = Object.entries(q).filter(([, v]) => v.roll_mean_gap != null).map(([a, v]) => `${a}: abertura média ${(100 * v.roll_mean_gap).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% nos ${v.roll_days} dias de troca (contra ${(100 * v.other_mean_gap).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% nos demais)`).join(' · ');
   return `<h2 style="margin:22px 0 8px;font-family:var(--font-display);font-size:18px">Placar honesto (teste cego ${sb.from}–hoje)</h2>
-    <div class="p2-note">A cada ano, o Pulso 2 escolhe as regras <b>usando só os anos anteriores</b> e prevê o ano seguinte, sem olhar o resultado. Só entram os dias em que há sinal estável; nos outros, ele não aposta. "Sempre alta" é o quanto se acertaria apostando em alta nesses mesmos dias, e a <b>força estatística acima de 2</b> indica algo além do acaso. Quando "Acerto" e "Sempre alta" são iguais, é porque o Pulso 2 só apostou em alta nesses dias.<br><small>Limite: a lista de regras e os limites (0,3%, 0,5%, 2 desvios) foram definidos olhando o histórico todo. Por isso a prova de verdade é o registro ao vivo, abaixo.</small></div>
+    <div class="p2-note">A cada ano, o Pulso mais Profundo escolhe as regras <b>usando só os anos anteriores</b> e prevê o ano seguinte, sem olhar o resultado. Só entram os dias em que há sinal estável; nos outros, ele não aposta. "Sempre alta" é o quanto se acertaria apostando em alta nesses mesmos dias, e a <b>força estatística acima de 2</b> indica algo além do acaso. Quando "Acerto" e "Sempre alta" são iguais, é porque o Pulso mais Profundo só apostou em alta nesses dias.<br><small>Limite: a lista de regras e os limites (0,3%, 0,5%, 2 desvios) foram definidos olhando o histórico todo. Por isso a prova de verdade é o registro ao vivo, abaixo.</small></div>
     <table class="p2-tbl"><thead><tr><th>Ativo</th><th>Momento</th><th>Previsões com sinal</th><th>Acerto</th><th>Sempre alta</th><th>Força</th></tr></thead><tbody>${linhas.join('')}</tbody></table>
     <div class="p2-note" style="margin-top:12px"><b>Movimento esperado:</b> a faixa típica deveria conter metade dos dias. No teste cego, a do WDO conteve ${pct(am.WDO.in_band, 0)} (correlação ${am.WDO.corr.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}) e a do WIN ${pct(am.WIN.in_band, 0)} (correlação ${am.WIN.corr.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}).${qtxt ? `<br><small>Preços ajustados para a troca de contrato — ${esc(qtxt)}.</small>` : ''}</div>`;
 }
@@ -108,7 +108,7 @@ function render(data) {
   const today = todayBRT();
   const first = data.days[0];
   let html = '';
-  html += `<div class="p2-note"><b>Como ler.</b> Aqui o Pulso 2 mostra, para cada dia útil, <b>dois números</b>: a probabilidade de alta (só se afasta de 50% quando há um sinal estatístico estável no histórico) e o <b>movimento esperado</b> do dia, que é a parte mais confiável. Feriados e fins de semana não aparecem. As porcentagens vêm de histórico desde 2012 e são <b>candidatas a sinal</b>: a prova real é o registro ao vivo, mais abaixo. Não é recomendação de investimento.</div>`;
+  html += `<div class="p2-note"><b>Como ler.</b> Aqui o Pulso mais Profundo mostra, para cada dia útil, <b>dois números</b>: a probabilidade de alta (só se afasta de 50% quando há um sinal estatístico estável no histórico) e o <b>movimento esperado</b> do dia, que é a parte mais confiável. Feriados e fins de semana não aparecem. As porcentagens vêm de histórico desde 2012 e são <b>candidatas a sinal</b>: a prova real é o registro ao vivo, mais abaixo. Não é recomendação de investimento.</div>`;
 
   const stale = Object.entries(data.stale).filter(([, v]) => v);
   if (stale.length) {
@@ -133,8 +133,8 @@ function render(data) {
   // registro ao vivo
   const live = data.live;
   const hitLine = live.n_scored ? `${live.hits} acertos em ${live.n_scored} previsões com direção (${pct(live.hits / live.n_scored)})` : 'Ainda sem previsões encerradas — o registro começa com a primeira previsão congelada.';
-  html += `<h2 style="margin:22px 0 8px;font-family:var(--font-display);font-size:18px">Registro ao vivo do Pulso 2</h2>
-    <div class="p2-note">Cada previsão é <b>congelada antes do pregão</b> e nunca é alterada. Aqui entra só o que o Pulso 2 previu de verdade, sem olhar o resultado. ${hitLine}</div>`;
+  html += `<h2 style="margin:22px 0 8px;font-family:var(--font-display);font-size:18px">Registro ao vivo do Pulso mais Profundo</h2>
+    <div class="p2-note">Cada previsão é <b>congelada antes do pregão</b> e nunca é alterada. Aqui entra só o que o Pulso mais Profundo previu de verdade, sem olhar o resultado. ${hitLine}</div>`;
   if (live.rows.length) {
     html += `<table class="p2-tbl"><thead><tr><th>Dia</th><th>Ativo</th><th>Prob. alta</th><th>Resultado</th><th></th></tr></thead><tbody>${live.rows.map((r) => `<tr><td>${short(r.date)}</td><td>${r.asset}</td><td>${pct(r.p_up)}</td><td>${r.result ? r.result : 'aguardando preços'}</td><td class="${r.hit === true ? 'p2-hit' : r.hit === false ? 'p2-miss' : ''}">${r.hit === null ? (r.directional ? '' : 'sem vantagem') : r.hit ? '✓' : '✗'}</td></tr>`).join('')}</tbody></table>`;
   }
@@ -173,14 +173,14 @@ function applyGap(asset, day, data, inp) {
 async function load() {
   if (!root) return;
   injectStyles();
-  root.innerHTML = '<div class="p2-note">Carregando o Pulso 2…</div>';
+  root.innerHTML = '<div class="p2-note">Carregando o Pulso mais Profundo…</div>';
   try {
     const r = await fetch('/api/pulso2');
     const j = await r.json();
     if (!r.ok || j.error) throw new Error(j.error || 'erro ' + r.status);
     render(j);
   } catch (e) {
-    root.innerHTML = `<div class="p2-note p2-warn"><b>Não consegui carregar o Pulso 2.</b> ${esc(e.message)}<br><small>As outras abas continuam funcionando normalmente.</small></div>`;
+    root.innerHTML = `<div class="p2-note p2-warn"><b>Não consegui carregar o Pulso mais Profundo.</b> ${esc(e.message)}<br><small>As outras abas continuam funcionando normalmente.</small></div>`;
   }
 }
 load();
