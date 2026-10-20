@@ -770,3 +770,12 @@ button, input, select {
 
 
 
+
+/* ── Cartão de contratos (WIN/WDO) ── */
+.contratos-card { margin: 0 0 16px; padding: 14px 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(255,255,255,0.03); }
+.contratos-titulo { font-weight: 600; margin-bottom: 10px; opacity: 0.9; }
+.contratos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.contrato-item { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.04); }
+.contrato-ativo { font-size: 0.85rem; opacity: 0.7; margin-bottom: 6px; }
+.contrato-linha { font-size: 0.9rem; line-height: 1.5; }
+.contratos-aviso { margin-top: 10px; font-size: 0.78rem; opacity: 0.6; }

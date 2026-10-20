@@ -987,3 +987,31 @@ if ('serviceWorker' in navigator) {
 
 
 
+
+/* ── Cartão de contratos (troca de vencimento WIN/WDO) ── */
+function renderContratosCard() {
+  const box = document.getElementById('contratos-card');
+  if (!box) return;
+  const fmt = (s) => { const [y, m, d] = s.split('-'); return `${d}/${m}`; };
+  const bloco = (nome, dados) => {
+    const a = dados.contrato_atual, p = dados.proximo_contrato;
+    return `<div class="contrato-item">
+      <div class="contrato-ativo">${nome}</div>
+      <div class="contrato-linha">Negociando agora: <strong>${a.codigo}</strong> · último pregão ${fmt(a.ultimo_pregao)}</div>
+      <div class="contrato-linha">Próximo: <strong>${p.codigo}</strong> · vence ${fmt(p.vencimento)}</div>
+    </div>`;
+  };
+  fetch('/api/contratos')
+    .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status)))
+    .then(d => {
+      box.innerHTML = `<div class="contratos-titulo">Contratos em negociação</div>
+        <div class="contratos-grid">
+          ${bloco('Mini Índice (WIN)', d.ativos.WIN)}
+          ${bloco('Mini Dólar (WDO)', d.ativos.WDO)}
+        </div>
+        <div class="contratos-aviso">Aviso enviado 24h antes de cada troca. Confira o contrato na sua plataforma antes de operar.</div>`;
+    })
+    .catch(() => { box.innerHTML = ''; });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderContratosCard);
+else renderContratosCard();
