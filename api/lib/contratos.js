@@ -21,7 +21,7 @@ const diaSemana = (s) => { const [y, m, d] = s.split('-').map(Number); return ne
 // Dia da troca do WIN no mês (y, m), pela regra escolhida:
 //  'segunda_quarta' (regra em uso): segunda quarta-feira do mês
 //  'mais_proxima_15' (regra oficial B3): quarta-feira mais próxima do dia 15
-export const REGRA_WIN = 'segunda_quarta';
+export const REGRA_WIN = 'mais_proxima_15'; // confirmada pelo calendário PNT (2026); a outra opção é 'segunda_quarta'
 function vencimentoWIN(y, m, regra = REGRA_WIN) {
   let alvo = null;
   if (regra === 'segunda_quarta') {
