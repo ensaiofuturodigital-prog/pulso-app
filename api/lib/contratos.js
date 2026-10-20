@@ -1,8 +1,9 @@
 // Calendário de vencimento dos contratos futuros WIN (mini índice) e WDO (mini dólar).
-// Regras (B3):
-//  - WIN: vence na quarta-feira mais próxima do dia 15 dos meses pares (G,J,M,Q,V,Z).
-//    Se não houver pregão nesse dia, vence no pregão seguinte. Último pregão = dia do vencimento.
-//  - WDO: vence no primeiro dia útil de cada mês. Último pregão = pregão anterior ao vencimento.
+// Regras em uso (pedido do Paulão, 16/10/2026):
+//  - WIN: troca na SEGUNDA quarta-feira dos meses pares (fev, abr, jun, ago, out, dez).
+//    Se não houver pregão nesse dia, passa para o pregão seguinte. Último pregão = dia da troca.
+//  - WDO: troca no ÚLTIMO dia útil de cada mês. Esse é o último pregão do contrato que vence no mês seguinte.
+// Regra oficial alternativa (B3, para comparação): WIN na quarta-feira mais próxima do dia 15.
 // Feriados e dias úteis vêm de pulso2-engine.js (mesma tabela já usada no Pulso 2).
 import { isBusinessDay, nextBusinessDays, prevBusinessDay } from './pulso2-engine.js';
 
@@ -17,14 +18,25 @@ const addDays = (s, n) => {
 };
 const diaSemana = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); };
 
-// Vencimento do WIN no mês (y, m)
-function vencimentoWIN(y, m) {
-  const dia15 = `${y}-${pad2(m)}-15`;
-  // quarta-feira (3) mais próxima do dia 15: entre -3 e +3 dias há exatamente uma
+// Dia da troca do WIN no mês (y, m), pela regra escolhida:
+//  'segunda_quarta' (regra em uso): segunda quarta-feira do mês
+//  'mais_proxima_15' (regra oficial B3): quarta-feira mais próxima do dia 15
+export const REGRA_WIN = 'segunda_quarta';
+function vencimentoWIN(y, m, regra = REGRA_WIN) {
   let alvo = null;
-  for (let off = -3; off <= 3; off++) {
-    const s = addDays(dia15, off);
-    if (diaSemana(s) === 3) { alvo = s; break; }
+  if (regra === 'segunda_quarta') {
+    const diasNoMes = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    let quartas = 0;
+    for (let d = 1; d <= diasNoMes; d++) {
+      const s = `${y}-${pad2(m)}-${pad2(d)}`;
+      if (diaSemana(s) === 3) { quartas++; if (quartas === 2) { alvo = s; break; } }
+    }
+  } else {
+    const dia15 = `${y}-${pad2(m)}-15`;
+    for (let off = -3; off <= 3; off++) {
+      const s = addDays(dia15, off);
+      if (diaSemana(s) === 3) { alvo = s; break; }
+    }
   }
   // se não há pregão nesse dia, passa para o próximo pregão
   let s = alvo;
@@ -39,6 +51,14 @@ function vencimentoWDO(y, m) {
   return s;
 }
 
+// Último dia útil do mês (y, m)
+function ultimoDiaUtilMes(y, m) {
+  const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  let s = `${y}-${pad2(m)}-${pad2(ultimo)}`;
+  while (!isBusinessDay(s)) s = addDays(s, -1);
+  return s;
+}
+
 // Lista os próximos contratos de um ativo a partir de uma data (inclusive o contrato que ainda negocia)
 export function proximosContratos(ativo, dataRef, quantidade = 6) {
   const [y0, m0] = dataRef.split('-').map(Number);
@@ -49,7 +69,7 @@ export function proximosContratos(ativo, dataRef, quantidade = 6) {
   while (out.length < quantidade) {
     if (ativo === 'WIN' && !MESES_WIN.includes(m)) { m += 1; if (m > 12) { m = 1; y += 1; } continue; }
     const venc = ativo === 'WIN' ? vencimentoWIN(y, m) : vencimentoWDO(y, m);
-    const ultimo = ativo === 'WIN' ? venc : prevBusinessDay(venc);
+    const ultimo = ativo === 'WIN' ? venc : (m === 1 ? ultimoDiaUtilMes(y - 1, 12) : ultimoDiaUtilMes(y, m - 1));
     if (ultimo >= dataRef) {
       out.push({
         ativo,
@@ -80,4 +100,11 @@ export function alertaParaAmanha(ativo, hojeS) {
   return { contrato: c, proximo: contratos[idx + 1] || null, amanha };
 }
 
-export const _interno = { vencimentoWIN, vencimentoWDO, addDays };
+// Calendário completo dos próximos N meses (para exibir no site)
+export function calendario(ativo, dataRef, meses = 15) {
+  const [y0, m0] = dataRef.split('-').map(Number);
+  const fim = (() => { let y = y0, m = m0 + meses; while (m > 12) { m -= 12; y++; } return `${y}-${pad2(m)}-${pad2(new Date(Date.UTC(y, m, 0)).getUTCDate())}`; })();
+  return proximosContratos(ativo, dataRef, meses + 2).filter(c => c.ultimo_pregao <= fim);
+}
+
+export const _interno = { vencimentoWIN, vencimentoWDO, ultimoDiaUtilMes, addDays };

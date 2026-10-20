@@ -779,3 +779,8 @@ button, input, select {
 .contrato-ativo { font-size: 0.85rem; opacity: 0.7; margin-bottom: 6px; }
 .contrato-linha { font-size: 0.9rem; line-height: 1.5; }
 .contratos-aviso { margin-top: 10px; font-size: 0.78rem; opacity: 0.6; }
+
+.contratos-cal { margin-top: 10px; font-size: 0.85rem; }
+.contratos-cal summary { cursor: pointer; opacity: 0.85; }
+.contratos-cal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+.contratos-cal ul { list-style: none; padding: 0; margin: 0; line-height: 1.7; }

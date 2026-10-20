@@ -1,5 +1,5 @@
 // GET /api/contratos → contrato em negociação, último pregão e próximos vencimentos (WIN e WDO).
-import { estadoAtual, proximosContratos } from './lib/contratos.js';
+import { estadoAtual, calendario, REGRA_WIN } from './lib/contratos.js';
 
 function hojeBrasilia() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -14,9 +14,10 @@ export default function handler(req, res) {
     out.ativos[ativo] = {
       contrato_atual: atual,
       proximo_contrato: proximo,
-      proximos: proximosContratos(ativo, hoje, 4),
+      calendario_15_meses: calendario(ativo, hoje, 15),
     };
   }
+  out.regra_win = REGRA_WIN;
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
   return res.status(200).json(out);
 }

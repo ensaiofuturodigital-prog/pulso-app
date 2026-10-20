@@ -1009,6 +1009,12 @@ function renderContratosCard() {
           ${bloco('Mini Índice (WIN)', d.ativos.WIN)}
           ${bloco('Mini Dólar (WDO)', d.ativos.WDO)}
         </div>
+        <details class="contratos-cal"><summary>Calendário de trocas — próximos 15 meses</summary>
+          <div class="contratos-cal-grid">
+            ${['WIN','WDO'].map(a => `<div><div class="contrato-ativo">${a === 'WIN' ? 'Mini Índice (WIN)' : 'Mini Dólar (WDO)'}</div>
+              <ul>${d.ativos[a].calendario_15_meses.map(c => `<li><strong>${c.codigo}</strong> · troca em ${fmt(c.ultimo_pregao)}</li>`).join('')}</ul></div>`).join('')}
+          </div>
+        </details>
         <div class="contratos-aviso">Aviso enviado 24h antes de cada troca. Confira o contrato na sua plataforma antes de operar.</div>`;
     })
     .catch(() => { box.innerHTML = ''; });
