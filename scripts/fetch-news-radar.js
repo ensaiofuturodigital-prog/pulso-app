@@ -70,6 +70,15 @@ const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=%22governo+federal%22+OR+%22reforma%22+OR+%22privatiza%C3%A7%C3%A3o%22+OR+haddad+OR+%22minist%C3%A9rio+da+fazenda%22&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Política BR', lang: 'pt', category: 'POLÍTICA' },
   { url: 'https://www.cnbc.com/id/10001147/device/rss/rss.html', source: 'CNBC Economy', lang: 'en', category: 'MACRO' },
   { url: 'https://feeds.marketwatch.com/marketwatch/topstories/', source: 'MarketWatch', lang: 'en', category: 'BOLSA' },
+  // ─── Fontes adicionadas (16/10/2026) ───
+  // Busca pública do Google Notícias filtrada por site: só títulos e links, sem copiar o texto.
+  { url: 'https://news.google.com/rss/search?q=site:bloomberg.com+(economy+OR+markets+OR+inflation+OR+%22central+bank%22+OR+Fed)&hl=en-US&gl=US&ceid=US:en', source: 'Bloomberg', lang: 'en', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:reuters.com+(economy+OR+markets+OR+inflation+OR+%22central+bank%22+OR+tariffs)&hl=en-US&gl=US&ceid=US:en', source: 'Reuters', lang: 'en', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:valor.globo.com+(juros+OR+d%C3%B3lar+OR+ibovespa+OR+infla%C3%A7%C3%A3o+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Valor Econômico', lang: 'pt', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:infomoney.com.br+(juros+OR+d%C3%B3lar+OR+ibovespa+OR+infla%C3%A7%C3%A3o+OR+Copom)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'InfoMoney', lang: 'pt', category: 'BOLSA' },
+  { url: 'https://news.google.com/rss/search?q=site:g1.globo.com/economia+(juros+OR+d%C3%B3lar+OR+infla%C3%A7%C3%A3o+OR+Copom+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'G1 Economia', lang: 'pt', category: 'MACRO' },
+  // B3 oficial: mapa de notícias público do Bora Investir (formato sitemap de notícias)
+  { url: 'https://borainvestir.b3.com.br/news-sitemap.xml', source: 'B3', lang: 'pt', category: 'B3', tipo: 'sitemap' },
 ];
 
 const EXCLUDE = [
@@ -127,7 +136,21 @@ async function fetchRSS(url, ms = 15000) {
   }
 }
 
+// Sitemap de notícias (formato Google News): <url><loc>…</loc><news:news><news:title>…</news:title><news:publication_date>…</news:publication_date></news:news></url>
+function parseSitemap(xml, feed) {
+  return [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map(m => {
+    const b = m[1];
+    const pick = (re) => (b.match(re) || [])[1]?.replace(/(<!\[CDATA\[|\]\]>)/g, '').trim() || '';
+    const title = pick(/<news:title>([\s\S]*?)<\/news:title>/);
+    const url   = pick(/<loc>([\s\S]*?)<\/loc>/);
+    const pub   = pick(/<news:publication_date>([\s\S]*?)<\/news:publication_date>/) || pick(/<lastmod>([\s\S]*?)<\/lastmod>/);
+    const date  = pub ? new Date(pub) : null;
+    return { title, url, pubDate: date, source: feed.source, category: feed.category, lang: feed.lang };
+  }).filter(i => i.title && i.url && i.pubDate && !isNaN(i.pubDate));
+}
+
 function parseRss(xml, feed) {
+  if (feed.tipo === 'sitemap') return parseSitemap(xml, feed);
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => {
     const block = m[1];
     const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1]
