@@ -1,0 +1,385 @@
+{
+  "gerado_em": "2026-10-21T17:48:45.447Z",
+  "alta_definida_como": "fechamento acima da abertura do próprio dia",
+  "WDO": {
+    "anos": [
+      {
+        "ano": 2012,
+        "motor": null,
+        "direcao": null,
+        "acerto_treino": null,
+        "sem_sinal": true,
+        "dias_com_sinal": 0,
+        "acertos": 0,
+        "taxa": null
+      },
+      {
+        "ano": 2013,
+        "motor": null,
+        "direcao": null,
+        "acerto_treino": null,
+        "sem_sinal": true,
+        "dias_com_sinal": 0,
+        "acertos": 0,
+        "taxa": null
+      },
+      {
+        "ano": 2014,
+        "motor": "surpresa_eua_negativa",
+        "direcao": "alta",
+        "acerto_treino": 0.5329,
+        "sem_sinal": false,
+        "dias_com_sinal": 79,
+        "acertos": 37,
+        "taxa": 0.4684
+      },
+      {
+        "ano": 2015,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5706,
+        "sem_sinal": false,
+        "dias_com_sinal": 66,
+        "acertos": 38,
+        "taxa": 0.5758
+      },
+      {
+        "ano": 2016,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5721,
+        "sem_sinal": false,
+        "dias_com_sinal": 64,
+        "acertos": 33,
+        "taxa": 0.5156
+      },
+      {
+        "ano": 2017,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5597,
+        "sem_sinal": false,
+        "dias_com_sinal": 41,
+        "acertos": 23,
+        "taxa": 0.561
+      },
+      {
+        "ano": 2018,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5599,
+        "sem_sinal": false,
+        "dias_com_sinal": 60,
+        "acertos": 37,
+        "taxa": 0.6167
+      },
+      {
+        "ano": 2019,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5685,
+        "sem_sinal": false,
+        "dias_com_sinal": 45,
+        "acertos": 26,
+        "taxa": 0.5778
+      },
+      {
+        "ano": 2020,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5695,
+        "sem_sinal": false,
+        "dias_com_sinal": 79,
+        "acertos": 44,
+        "taxa": 0.557
+      },
+      {
+        "ano": 2021,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5676,
+        "sem_sinal": false,
+        "dias_com_sinal": 52,
+        "acertos": 34,
+        "taxa": 0.6538
+      },
+      {
+        "ano": 2022,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5754,
+        "sem_sinal": false,
+        "dias_com_sinal": 63,
+        "acertos": 21,
+        "taxa": 0.3333
+      },
+      {
+        "ano": 2023,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5513,
+        "sem_sinal": false,
+        "dias_com_sinal": 35,
+        "acertos": 18,
+        "taxa": 0.5143
+      },
+      {
+        "ano": 2024,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5494,
+        "sem_sinal": false,
+        "dias_com_sinal": 36,
+        "acertos": 26,
+        "taxa": 0.7222
+      },
+      {
+        "ano": 2025,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5582,
+        "sem_sinal": false,
+        "dias_com_sinal": 25,
+        "acertos": 10,
+        "taxa": 0.4
+      },
+      {
+        "ano": 2026,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5528,
+        "sem_sinal": false,
+        "dias_com_sinal": 37,
+        "acertos": 17,
+        "taxa": 0.4595
+      }
+    ],
+    "total": {
+      "dias_com_sinal": 682,
+      "acertos": 364,
+      "taxa": 0.5337,
+      "z": 1.76
+    }
+  },
+  "WIN": {
+    "anos": [
+      {
+        "ano": 2006,
+        "motor": null,
+        "direcao": null,
+        "acerto_treino": null,
+        "sem_sinal": true,
+        "dias_com_sinal": 0,
+        "acertos": 0,
+        "taxa": null
+      },
+      {
+        "ano": 2007,
+        "motor": null,
+        "direcao": null,
+        "acerto_treino": null,
+        "sem_sinal": true,
+        "dias_com_sinal": 0,
+        "acertos": 0,
+        "taxa": null
+      },
+      {
+        "ano": 2008,
+        "motor": null,
+        "direcao": null,
+        "acerto_treino": 0.5196,
+        "sem_sinal": true,
+        "dias_com_sinal": 0,
+        "acertos": 0,
+        "taxa": null
+      },
+      {
+        "ano": 2009,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5201,
+        "sem_sinal": false,
+        "dias_com_sinal": 86,
+        "acertos": 46,
+        "taxa": 0.5349
+      },
+      {
+        "ano": 2010,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5234,
+        "sem_sinal": false,
+        "dias_com_sinal": 67,
+        "acertos": 35,
+        "taxa": 0.5224
+      },
+      {
+        "ano": 2011,
+        "motor": "gap_queda",
+        "direcao": "alta",
+        "acerto_treino": 0.5233,
+        "sem_sinal": false,
+        "dias_com_sinal": 63,
+        "acertos": 31,
+        "taxa": 0.4921
+      },
+      {
+        "ano": 2012,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5256,
+        "sem_sinal": false,
+        "dias_com_sinal": 36,
+        "acertos": 20,
+        "taxa": 0.5556
+      },
+      {
+        "ano": 2013,
+        "motor": "surpresa_eua_negativa",
+        "direcao": "baixa",
+        "acerto_treino": 0.5694,
+        "sem_sinal": false,
+        "dias_com_sinal": 75,
+        "acertos": 33,
+        "taxa": 0.44
+      },
+      {
+        "ano": 2014,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5536,
+        "sem_sinal": false,
+        "dias_com_sinal": 22,
+        "acertos": 10,
+        "taxa": 0.4545
+      },
+      {
+        "ano": 2015,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5447,
+        "sem_sinal": false,
+        "dias_com_sinal": 28,
+        "acertos": 16,
+        "taxa": 0.5714
+      },
+      {
+        "ano": 2016,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5474,
+        "sem_sinal": false,
+        "dias_com_sinal": 30,
+        "acertos": 18,
+        "taxa": 0.6
+      },
+      {
+        "ano": 2017,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5526,
+        "sem_sinal": false,
+        "dias_com_sinal": 17,
+        "acertos": 8,
+        "taxa": 0.4706
+      },
+      {
+        "ano": 2018,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5483,
+        "sem_sinal": false,
+        "dias_com_sinal": 25,
+        "acertos": 11,
+        "taxa": 0.44
+      },
+      {
+        "ano": 2019,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5405,
+        "sem_sinal": false,
+        "dias_com_sinal": 14,
+        "acertos": 7,
+        "taxa": 0.5
+      },
+      {
+        "ano": 2020,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5389,
+        "sem_sinal": false,
+        "dias_com_sinal": 16,
+        "acertos": 9,
+        "taxa": 0.5625
+      },
+      {
+        "ano": 2021,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5399,
+        "sem_sinal": false,
+        "dias_com_sinal": 22,
+        "acertos": 14,
+        "taxa": 0.6364
+      },
+      {
+        "ano": 2022,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5452,
+        "sem_sinal": false,
+        "dias_com_sinal": 33,
+        "acertos": 20,
+        "taxa": 0.6061
+      },
+      {
+        "ano": 2023,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5499,
+        "sem_sinal": false,
+        "dias_com_sinal": 29,
+        "acertos": 17,
+        "taxa": 0.5862
+      },
+      {
+        "ano": 2024,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5522,
+        "sem_sinal": false,
+        "dias_com_sinal": 35,
+        "acertos": 17,
+        "taxa": 0.4857
+      },
+      {
+        "ano": 2025,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5475,
+        "sem_sinal": false,
+        "dias_com_sinal": 21,
+        "acertos": 11,
+        "taxa": 0.5238
+      },
+      {
+        "ano": 2026,
+        "motor": "queda_3_dias",
+        "direcao": "alta",
+        "acerto_treino": 0.5465,
+        "sem_sinal": false,
+        "dias_com_sinal": 26,
+        "acertos": 12,
+        "taxa": 0.4615
+      }
+    ],
+    "total": {
+      "dias_com_sinal": 645,
+      "acertos": 335,
+      "taxa": 0.5194,
+      "z": 0.98
+    }
+  },
+  "observacao": "Cada ano é escolhido só com dados de anos anteriores. Resultado fora da amostra."
+}
