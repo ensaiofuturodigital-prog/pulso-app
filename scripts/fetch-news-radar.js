@@ -1,4 +1,6 @@
 import { archiveAndPrune } from './lib/news-archive.js';
+import { ehUrgente, escaparMd, bandeira } from './lib/noticias-regras.js';
+import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
 
@@ -162,6 +164,40 @@ function parseRss(xml, feed) {
   }).filter(i => i.title && i.url && i.pubDate && !isNaN(i.pubDate) && passes(i.title, feed.lang));
 }
 
+// ─── ALERTA URGENTE IMEDIATO ───────────────────────────────────────────────
+// Notícia urgente (camada 1) sai na hora, sem esperar o horário do resumo.
+// Só envia notícias publicadas nas últimas 2 horas e cada link uma única vez.
+const ENVIAR_URGENTE = process.env.ENVIAR_URGENTE === 'true';
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
+
+async function enviarUrgentes(items) {
+  if (!ENVIAR_URGENTE) { console.log('Alerta urgente imediato desligado (ENVIAR_URGENTE != true).'); return; }
+  const limite = Date.now() - 2 * 3600000;
+  const urgentes = items.filter(i => ehUrgente(i.title) && i.pubDate && i.pubDate.getTime() >= limite);
+  for (const n of urgentes) {
+    const slot = 'urgente_' + createHash('sha1').update(n.url).digest('hex').slice(0, 24);
+    const { error } = await supabase.from('telegram_sends').insert({ slot });
+    if (error) { if (error.code === '23505') continue; throw error; }
+    const texto = [
+      `🚨 *ALERTA URGENTE* ${bandeira(classifyRegion(n.title))}`,
+      '',
+      escaparMd(n.title),
+      '',
+      `Fonte: ${escaparMd(n.source)}`,
+      `[ler notícia](${n.url})`,
+    ].join('\n');
+    const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TG_CHAT, text: texto, parse_mode: 'Markdown', disable_web_page_preview: true }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(`Telegram: ${JSON.stringify(data)}`);
+    console.log(`🚨 Urgente enviado: ${n.title.slice(0, 80)}`);
+  }
+}
+
 async function run() {
   console.log(`🕐 Coleta — ${new Date().toISOString()}`);
   let all = [];
@@ -205,6 +241,7 @@ async function run() {
     const { error } = await supabase.from('news').upsert(rows, { onConflict: 'url', ignoreDuplicates: true });
     if (error) throw error;
     console.log(`✅ ${rows.length} salvas no banco em português.`);
+    await enviarUrgentes(translated);
   }
 
   // Painel guarda 48h; antes de sair do painel, a notícia é ARQUIVADA em news_archive (nada se perde).

@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { mensagensDoDia } from './lib/probabilidades-msg.js';
+import { estadoAtual } from '../api/lib/contratos.js';
 import fetch from 'node-fetch';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -164,17 +166,16 @@ async function buildReport() {
     }
   }
 
-  const weekdaysPt = ['DOMINGO', 'SEGUNDA FEIRA', 'TERÇA FEIRA', 'QUARTA FEIRA', 'QUINTA FEIRA', 'SEXTA FEIRA', 'SÁBADO'];
-  const monthsPt = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
-  const dObj = new Date(dateStr + 'T12:00:00Z');
-  const headerLine = `📊 PROBABILIDADES PARA DAY TRADE NOS ATIVOS HOJE: ${weekdaysPt[dObj.getUTCDay()]} ${dObj.getUTCDate()} DE ${monthsPt[dObj.getUTCMonth()]} DE ${dObj.getUTCFullYear()}`;
+  // Contrato em negociação hoje (ex.: WDOX26, WINZ26) — calculado pelo calendário oficial
+  const wdoCodigo = estadoAtual('WDO', dateStr).atual.codigo;
+  const winCodigo = estadoAtual('WIN', dateStr).atual.codigo;
 
-  let msg = `${headerLine}\n\n`;
-  msg += `MINI-DÓLAR (WDO) = ${aggProb != null ? aggProb + '% DE CHANCE DE ALTA' : 'SEM DADO SUFICIENTE'}\n`;
-  msg += `MINI-ÍNDICE (WIN) = ${aggProbIbov != null ? aggProbIbov + '% DE CHANCE DE ALTA' : 'SEM DADO SUFICIENTE'}\n\n`;
-  msg += `"NÃO É RECOMENDAÇÃO DE OPERAÇÃO"`;
-
-  return msg;
+  // Duas mensagens separadas: uma para o mini dólar e outra para o mini índice
+  return mensagensDoDia({
+    dateStr,
+    wdo: { codigo: wdoCodigo, up: aggProb },
+    win: { codigo: winCodigo, up: aggProbIbov },
+  });
 }
 
 async function sendTelegram(text) {
@@ -214,8 +215,8 @@ async function run() {
       return;
     }
   }
-  const msg = await buildReport();
-  await sendTelegram(msg);
+  const msgs = await buildReport();
+  for (const msg of msgs) await sendTelegram(msg);
 }
 
 run().catch(err => { console.error('❌ Falha:', err.message); process.exitCode = 1; });
