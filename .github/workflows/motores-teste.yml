@@ -1,0 +1,33 @@
+name: Motores do Pulso mais Profundo (teste para frente)
+
+# Roda o teste ano a ano e grava o resultado em motores-out/resultado.json.
+# Não altera o banco nem envia nada ao Telegram.
+on:
+  push:
+    branches: [motores-fontes-radar-20261021]
+    paths-ignore: ['motores-out/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  motores:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Roda o teste para frente
+        run: node scripts/motores/rodar.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      - name: Grava o resultado no repositório
+        run: |
+          git config user.name "motores-bot"
+          git config user.email "motores@local"
+          git add motores-out/resultado.json
+          git commit -m "motores: resultado do teste para frente" || echo "sem mudança"
+          git push origin HEAD:motores-fontes-radar-20261021
