@@ -1015,7 +1015,7 @@ function renderContratosCard() {
               <ul>${d.ativos[a].calendario_15_meses.map(c => `<li><strong>${c.codigo}</strong> · troca em ${fmt(c.ultimo_pregao)}</li>`).join('')}</ul></div>`).join('')}
           </div>
         </details>
-        <div class="contratos-aviso">Aviso enviado 24h antes de cada troca. Confira o contrato na sua plataforma antes de operar.</div>`;
+        <div class="contratos-aviso">Avisos no Telegram: dia anterior à troca (06h e 10h) e no dia da troca (06h). Confira o contrato na sua plataforma antes de operar.</div>`;
     })
     .catch(() => { box.innerHTML = ''; });
 }

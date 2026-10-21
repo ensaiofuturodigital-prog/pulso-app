@@ -1,11 +1,14 @@
 name: Alerta de troca de contrato (WIN/WDO)
 
-# Todo dia útil às 09:00 (Brasília) verifica se amanhã é o último pregão de algum contrato
-# e avisa no Telegram. Também pode ser disparado na mão: Actions > "Alerta de troca de contrato"
+# Todo dia útil, às 06:00 e às 10:00 (Brasília), verifica se há troca de contrato:
+#  - dia anterior à troca: avisa às 06h e às 10h
+#  - dia da troca: avisa às 06h
+# Envia no grupo RECICLA TRADERS (Telegram). Também pode ser disparado na mão: Actions > "Alerta de troca de contrato"
 # > Run workflow (por padrão em modo TESTE: não envia nada).
 on:
   schedule:
-    - cron: '0 12 * * 1-5'
+    - cron: '0 9 * * 1-5'    # 06:00 Brasília
+    - cron: '0 13 * * 1-5'   # 10:00 Brasília
   workflow_dispatch:
     inputs:
       dry_run:

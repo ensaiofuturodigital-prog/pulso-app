@@ -107,4 +107,20 @@ export function calendario(ativo, dataRef, meses = 15) {
   return proximosContratos(ativo, dataRef, meses + 2).filter(c => c.ultimo_pregao <= fim);
 }
 
+// Eventos do dia para os avisos:
+//  'antes' → amanhã é o último pregão do contrato (aviso no dia anterior, 06h e 10h)
+//  'dia'   → hoje é o último pregão do contrato (aviso no dia da troca, 06h)
+export function eventosDoDia(hojeS) {
+  const amanha = nextBusinessDays(hojeS, 1, {}, false)[0];
+  const out = [];
+  for (const ativo of ['WIN', 'WDO']) {
+    const cs = proximosContratos(ativo, hojeS, 3);
+    const iA = cs.findIndex(c => c.ultimo_pregao === amanha);
+    if (iA >= 0) out.push({ tipo: 'antes', ativo, contrato: cs[iA], proximo: cs[iA + 1] || null, data_troca: amanha });
+    const iH = cs.findIndex(c => c.ultimo_pregao === hojeS);
+    if (iH >= 0) out.push({ tipo: 'dia', ativo, contrato: cs[iH], proximo: cs[iH + 1] || null, data_troca: hojeS });
+  }
+  return out;
+}
+
 export const _interno = { vencimentoWIN, vencimentoWDO, ultimoDiaUtilMes, addDays };
