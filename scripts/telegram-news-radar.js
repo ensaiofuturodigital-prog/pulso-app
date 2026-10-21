@@ -20,12 +20,14 @@ async function buildDigest() {
     .gte('published_at', cutoff)
     .order('published_at', { ascending: false });
   if (error) throw error;
-  if (!data || data.length === 0) return null;
+  // Descarta qualquer título que seja aviso de serviço de tradução (dados antigos gravados por engano)
+  const dados = data.filter(n => !/MYMEMORY|TRANSLATIONS FOR TODAY/i.test(n.title || ''));
+  if (!dados || dados.length === 0) return null;
 
   const agora = new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
   }).format(new Date());
-  return montarResumo(data, agora);
+  return montarResumo(dados, agora);
 }
 
 async function sendTelegram(text) {

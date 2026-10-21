@@ -1,5 +1,6 @@
 import { archiveAndPrune } from './lib/news-archive.js';
 import { ehUrgente, escaparMd, bandeira } from './lib/noticias-regras.js';
+import { pareceIngles, ehRespostaInvalida } from './lib/idioma.js';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
@@ -19,7 +20,7 @@ async function translateGoogle(text) {
   const data = await res.json();
   // Formato: [[["texto traduzido","texto original",null,null,...], ...], ...]
   const translated = data?.[0]?.map(chunk => chunk[0]).join('') || '';
-  if (!translated) throw new Error('resposta vazia');
+  if (!translated || ehRespostaInvalida(translated)) throw new Error('resposta vazia');
   return translated;
 }
 
@@ -28,6 +29,7 @@ async function translateMyMemory(text) {
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   const data = await res.json();
   const translated = data.responseData?.translatedText;
+  if (ehRespostaInvalida(translated)) throw new Error('limite do serviço de tradução reserva');
   if (!translated || translated === text) throw new Error('sem tradução');
   return translated;
 }
@@ -47,11 +49,15 @@ async function translateToPortuguese(text) {
 // Detecta se o título está em inglês (feeds com lang='en')
 // Traduz em lotes para não sobrecarregar a API
 async function translateBatch(items) {
-  const toTranslate = items.filter(i => i.lang === 'en');
-  console.log(`🔤 Traduzindo ${toTranslate.length} títulos em inglês...`);
+  // Traduz pelo TEXTO do título: vale para qualquer feed, inclusive os marcados como português
+  const toTranslate = items.filter(i => i.lang === 'en' || pareceIngles(i.title));
+  console.log(`🔤 Traduzindo ${toTranslate.length} títulos em inglês (de qualquer feed)...`);
 
   for (const item of toTranslate) {
+    const original = item.title;
     item.title = await translateToPortuguese(item.title);
+    item.naoTraduzido = (item.title === original && pareceIngles(original)) || ehRespostaInvalida(item.title);
+    item.lang = 'pt';
     // Pequena pausa para não sobrecarregar a API (1000 req/dia gratuitas)
     await new Promise(r => setTimeout(r, 200));
   }
@@ -225,7 +231,10 @@ async function run() {
   console.log(`\n📰 ${unique.length} manchetes únicas`);
 
   // Traduzir títulos em inglês
-  const translated = await translateBatch(unique);
+  const translated0 = await translateBatch(unique);
+  // Só entra no banco o que está em português: manchete que não pôde ser traduzida fica para a próxima coleta
+  const translated = translated0.filter(i => !i.naoTraduzido);
+  console.log(`🈯 ${translated0.length - translated.length} títulos ficaram sem tradução e foram adiados.`);
   console.log(`✅ Tradução concluída.`);
 
   if (translated.length > 0) {
