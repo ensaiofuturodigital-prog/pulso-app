@@ -1,0 +1,32 @@
+name: Alerta de feriado da B3
+
+# Dias úteis, às 06:00 e às 10:00 (Brasília): avisa feriado da B3 no dia útil anterior e no próprio dia.
+# Feriados em fim de semana não geram alerta. Também pode ser disparado manualmente em modo teste.
+on:
+  schedule:
+    - cron: '0 9 * * 1-5'    # 06:00 Brasília
+    - cron: '0 13 * * 1-5'   # 10:00 Brasília
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Modo teste (não envia nada)'
+        type: boolean
+        default: true
+
+jobs:
+  feriados:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --omit=dev --no-audit --no-fund
+      - name: Verifica feriados e avisa
+        run: node scripts/alerta-feriados.js
+        env:
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || (inputs.dry_run && 'true' || 'false') }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

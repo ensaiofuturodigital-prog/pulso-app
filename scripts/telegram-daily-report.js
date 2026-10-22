@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { mensagensDoDia } from './lib/probabilidades-msg.js';
+import { b3HolidayMap } from '../api/lib/pulso2-engine.js';
 import { estadoAtual } from '../api/lib/contratos.js';
 import fetch from 'node-fetch';
 
@@ -43,29 +44,10 @@ function easterDate(year) {
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function dstr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
+// Feriados e fechamentos da B3: mesma tabela do motor (api/lib/pulso2-engine.js)
 function isBrHoliday(dateStr) {
   const year = parseInt(dateStr.slice(0, 4), 10);
-  const easter = easterDate(year);
-  const goodFriday = addDays(easter, -2);
-  const carnavalMon = addDays(easter, -48);
-  const carnavalTue = addDays(easter, -47);
-  const corpusChristi = addDays(easter, 60);
-  const brHolidays = [
-    new Date(year, 0, 1),   // Confraternização Universal
-    carnavalMon,
-    carnavalTue,
-    goodFriday,
-    new Date(year, 3, 21),  // Tiradentes
-    new Date(year, 4, 1),   // Dia do Trabalho
-    corpusChristi,
-    new Date(year, 8, 7),   // Independência do Brasil
-    new Date(year, 9, 12),  // Nossa Sr.ª Aparecida
-    new Date(year, 10, 2),  // Finados
-    new Date(year, 10, 15), // Proclamação da República
-    new Date(year, 10, 20), // Consciência Negra
-    new Date(year, 11, 25), // Natal
-  ];
-  return brHolidays.some(h => dstr(h) === dateStr);
+  return !!b3HolidayMap(year)[dateStr];
 }
 
 // Fim de semana ou feriado nacional = B3 fechada, sem dado econômico novo pra divulgar.
