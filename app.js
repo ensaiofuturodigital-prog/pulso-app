@@ -786,8 +786,11 @@ function getHolidays(year) {
     { d: new Date(year, 9, 12), name: "Nossa Sr.ª Aparecida" },
     { d: new Date(year, 10, 2), name: "Finados" },
     { d: new Date(year, 10, 15), name: "Proclamação da República" },
-    { d: new Date(year, 10, 20), name: "Consciência Negra" },
+    // Consciência Negra é feriado nacional desde 2024
+    ...(year >= 2024 ? [{ d: new Date(year, 10, 20), name: "Consciência Negra" }] : []),
+    { d: new Date(year, 11, 24), name: "Véspera de Natal (B3 sem pregão)" },
     { d: new Date(year, 11, 25), name: "Natal" },
+    { d: new Date(year, 11, 31), name: "Véspera de Ano Novo (B3 sem pregão)" },
   ];
 
   const map = {};
