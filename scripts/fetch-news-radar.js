@@ -79,6 +79,15 @@ const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=site:valor.globo.com+(juros+OR+d%C3%B3lar+OR+ibovespa+OR+infla%C3%A7%C3%A3o+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Valor Econômico', lang: 'pt', category: 'MACRO' },
   { url: 'https://news.google.com/rss/search?q=site:infomoney.com.br+(juros+OR+d%C3%B3lar+OR+ibovespa+OR+infla%C3%A7%C3%A3o+OR+Copom)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'InfoMoney', lang: 'pt', category: 'BOLSA' },
   { url: 'https://news.google.com/rss/search?q=site:g1.globo.com/economia+(juros+OR+d%C3%B3lar+OR+infla%C3%A7%C3%A3o+OR+Copom+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'G1 Economia', lang: 'pt', category: 'MACRO' },
+  // Brasil: jornais e órgãos oficiais (busca pública do Google Notícias filtrada por site; só títulos e links)
+  { url: 'https://news.google.com/rss/search?q=site:estadao.com.br/economia+(juros+OR+d%C3%B3lar+OR+infla%C3%A7%C3%A3o+OR+fiscal+OR+Copom)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Estadão Economia', lang: 'pt', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:folha.uol.com.br/mercado+(juros+OR+d%C3%B3lar+OR+infla%C3%A7%C3%A3o+OR+fiscal+OR+Copom)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Folha Mercado', lang: 'pt', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:exame.com+(bolsa+OR+ibovespa+OR+d%C3%B3lar+OR+juros)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Exame', lang: 'pt', category: 'BOLSA' },
+  { url: 'https://news.google.com/rss/search?q=site:moneytimes.com.br+(ibovespa+OR+d%C3%B3lar+OR+juros+OR+Selic)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Money Times', lang: 'pt', category: 'BOLSA' },
+  { url: 'https://news.google.com/rss/search?q=site:agenciabrasil.ebc.com.br+(economia+OR+infla%C3%A7%C3%A3o+OR+juros+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Agência Brasil', lang: 'pt', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:bcb.gov.br+(Copom+OR+Selic+OR+infla%C3%A7%C3%A3o+OR+comunicado)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Banco Central', lang: 'pt', category: 'JUROS/BC' },
+  { url: 'https://news.google.com/rss/search?q=site:gov.br/cvm+(comunicado+OR+regra+OR+resolu%C3%A7%C3%A3o+OR+mercado)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'CVM', lang: 'pt', category: 'B3' },
+  { url: 'https://news.google.com/rss/search?q=site:gov.br/tesouronacional+(d%C3%ADvida+OR+fiscal+OR+leil%C3%A3o)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Tesouro Nacional', lang: 'pt', category: 'FISCAL' },
   // B3 oficial: mapa de notícias público do Bora Investir (formato sitemap de notícias)
   { url: 'https://borainvestir.b3.com.br/news-sitemap.xml', source: 'B3', lang: 'pt', category: 'B3', tipo: 'sitemap' },
 ];

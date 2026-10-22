@@ -784,3 +784,7 @@ button, input, select {
 .contratos-cal summary { cursor: pointer; opacity: 0.85; }
 .contratos-cal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
 .contratos-cal ul { list-style: none; padding: 0; margin: 0; line-height: 1.7; }
+
+/* ── Radar em camadas ── */
+.news-secao { margin-bottom: 14px; }
+.news-secao-titulo { font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); margin: 14px 0 6px; font-family: var(--font-mono); }
