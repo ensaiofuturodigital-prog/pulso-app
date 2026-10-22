@@ -62,9 +62,9 @@ async function translateBatch(items) {
 const FEEDS = [
   { url: 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Economia BR', lang: 'pt', category: 'MACRO' },
   { url: 'https://news.google.com/rss/search?q=Fed+OR+BCE+OR+%22banco+central%22+OR+Copom+OR+Selic&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Bancos Centrais', lang: 'pt', category: 'JUROS/BC' },
-  { url: 'https://news.google.com/rss/search?q=d%C3%B3lar+OR+c%C3%A2mbio+OR+ibovespa+OR+%22bolsa+de+valores%22', source: 'Mercado BR', lang: 'pt', category: 'BOLSA' },
-  { url: 'https://news.google.com/rss/search?q=petr%C3%B3leo+OR+ouro+OR+soja+OR+commodities+OR+brent', source: 'Commodities', lang: 'pt', category: 'COMMODITIES' },
-  { url: 'https://news.google.com/rss/search?q=%22arcabou%C3%A7o+fiscal%22+OR+%22reforma+tribut%C3%A1ria%22+OR+%22d%C3%ADvida+p%C3%BAblica%22+OR+%22tesouro+nacional%22', source: 'Fiscal BR', lang: 'pt', category: 'FISCAL' },
+  { url: 'https://news.google.com/rss/search?q=d%C3%B3lar+OR+c%C3%A2mbio+OR+ibovespa+OR+%22bolsa+de+valores%22&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Mercado BR', lang: 'pt', category: 'BOLSA' },
+  { url: 'https://news.google.com/rss/search?q=petr%C3%B3leo+OR+ouro+OR+soja+OR+commodities+OR+brent&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Commodities', lang: 'pt', category: 'COMMODITIES' },
+  { url: 'https://news.google.com/rss/search?q=%22arcabou%C3%A7o+fiscal%22+OR+%22reforma+tribut%C3%A1ria%22+OR+%22d%C3%ADvida+p%C3%BAblica%22+OR+%22tesouro+nacional%22&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Fiscal BR', lang: 'pt', category: 'FISCAL' },
   { url: 'https://news.google.com/rss/search?q=nasdaq+OR+%22S%26P+500%22+OR+%22dow+jones%22+OR+%22wall+street%22&hl=en-US&gl=US&ceid=US:en', source: 'Wall Street', lang: 'en', category: 'BOLSA' },
   { url: 'https://news.google.com/rss/search?q=inflation+OR+recession+OR+%22interest+rates%22+OR+%22central+bank%22+OR+GDP+OR+IMF&hl=en-US&gl=US&ceid=US:en', source: 'Macro Global', lang: 'en', category: 'MACRO' },
   { url: 'https://news.google.com/rss/search?q=tariffs+OR+sanctions+OR+%22trade+war%22+OR+%22china+economy%22+OR+opec&hl=en-US&gl=US&ceid=US:en', source: 'Geopolítica', lang: 'en', category: 'POLÍTICA' },
@@ -79,6 +79,15 @@ const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=site:valor.globo.com+(juros+OR+d%C3%B3lar+OR+ibovespa+OR+infla%C3%A7%C3%A3o+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Valor Econômico', lang: 'pt', category: 'MACRO' },
   { url: 'https://news.google.com/rss/search?q=site:infomoney.com.br+(juros+OR+d%C3%B3lar+OR+ibovespa+OR+infla%C3%A7%C3%A3o+OR+Copom)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'InfoMoney', lang: 'pt', category: 'BOLSA' },
   { url: 'https://news.google.com/rss/search?q=site:g1.globo.com/economia+(juros+OR+d%C3%B3lar+OR+infla%C3%A7%C3%A3o+OR+Copom+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'G1 Economia', lang: 'pt', category: 'MACRO' },
+  // Brasil: jornais e órgãos oficiais (busca pública do Google Notícias filtrada por site; só títulos e links)
+  { url: 'https://news.google.com/rss/search?q=site:estadao.com.br/economia+(juros+OR+d%C3%B3lar+OR+infla%C3%A7%C3%A3o+OR+fiscal+OR+Copom)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Estadão Economia', lang: 'pt', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:folha.uol.com.br/mercado+(juros+OR+d%C3%B3lar+OR+infla%C3%A7%C3%A3o+OR+fiscal+OR+Copom)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Folha Mercado', lang: 'pt', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:exame.com+(bolsa+OR+ibovespa+OR+d%C3%B3lar+OR+juros)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Exame', lang: 'pt', category: 'BOLSA' },
+  { url: 'https://news.google.com/rss/search?q=site:moneytimes.com.br+(ibovespa+OR+d%C3%B3lar+OR+juros+OR+Selic)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Money Times', lang: 'pt', category: 'BOLSA' },
+  { url: 'https://news.google.com/rss/search?q=site:agenciabrasil.ebc.com.br+(economia+OR+infla%C3%A7%C3%A3o+OR+juros+OR+fiscal)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Agência Brasil', lang: 'pt', category: 'MACRO' },
+  { url: 'https://news.google.com/rss/search?q=site:bcb.gov.br+(Copom+OR+Selic+OR+infla%C3%A7%C3%A3o+OR+comunicado)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Banco Central', lang: 'pt', category: 'JUROS/BC' },
+  { url: 'https://news.google.com/rss/search?q=site:gov.br/cvm+(comunicado+OR+regra+OR+resolu%C3%A7%C3%A3o+OR+mercado)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'CVM', lang: 'pt', category: 'B3' },
+  { url: 'https://news.google.com/rss/search?q=site:gov.br/tesouronacional+(d%C3%ADvida+OR+fiscal+OR+leil%C3%A3o)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Tesouro Nacional', lang: 'pt', category: 'FISCAL' },
   // B3 oficial: mapa de notícias público do Bora Investir (formato sitemap de notícias)
   { url: 'https://borainvestir.b3.com.br/news-sitemap.xml', source: 'B3', lang: 'pt', category: 'B3', tipo: 'sitemap' },
 ];

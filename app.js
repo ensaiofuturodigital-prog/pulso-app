@@ -214,24 +214,42 @@ const BREAKING_KEYWORDS = [
   'escândalo', 'escandalo', 'investigação', 'investigacao', 'indiciado', 'indiciada', 'impeachment',
   'cpi', 'operação da polícia federal', 'operacao da policia federal', 'prisão de', 'prisao de',
 ];
+// Regra de ALERTA URGENTE: igual à do robô do Telegram (scripts/lib/noticias-regras.js)
+const URGENTE_REGRAS = [
+  /\b(copom|fed|bce|boj|banco central)\b.*\b(decide|decidiu|anuncia|anunciou|elevou|cortou|manteve|reduziu|surpreende)\b.*\b(juros|taxa|selic)\b/i,
+  /\b(presidente eleito|presidente eleita|eleito presidente|eleita presidente|vence (a )?elei[çc][aã]o presidencial)\b/i,
+  /\b(circuit breaker|bolsa despenca|ibovespa despenca|nasdaq despenca|dow jones despenca|crash do mercado)\b/i,
+  /\b(calote|default soberano|moratória soberana|moratoria soberana)\b/i,
+];
+const CHEFE_ESTADO = /\b(presidente|primeiro-ministro|primeira-ministra|rei|chanceler|ministro da fazenda|presidente do fed|powell)\b/i;
+const SAIDA_CARGO = /\b(morre|morreu|falece|faleceu|renuncia|renunciou|deixa o cargo|deixou o cargo)\b/i;
 function isBreaking(title) {
-  const t = title.toLowerCase();
-  return BREAKING_KEYWORDS.some(k => t.includes(k));
+  if (URGENTE_REGRAS.some(r => r.test(title))) return true;
+  return CHEFE_ESTADO.test(title) && SAIDA_CARGO.test(title);
 }
 
 // Mapa de bandeiras por country_tag
 const FLAG_MAP = { BR:'🇧🇷', US:'🇺🇸', EA:'🇪🇺', CN:'🇨🇳', JP:'🇯🇵', GB:'🇬🇧', GLOBAL:'🌐' };
 // Mapa de labels e cores por categoria
 const CAT_MAP = {
-  MACRO:       { label:'MACRO',       color:'#3b82f6' },
-  JUROS:       { label:'JUROS',       color:'#8b5cf6' },
-  MERCADO:     { label:'MERCADO',     color:'#10b981' },
-  COMMODITIES: { label:'COMMODIT.',   color:'#f59e0b' },
-  FISCAL:      { label:'FISCAL',      color:'#ef4444' },
-  GEO:         { label:'GEOPOLÍT.',   color:'#f97316' },
-  CORPORATIVO: { label:'CORPORAT.',   color:'#6366f1' },
-  POLITICA:    { label:'POLÍTICA',    color:'#ec4899' },
+  'MACRO':        { label:'MACRO',           color:'#3b82f6' },
+  'JUROS/BC':     { label:'JUROS / BC',      color:'#8b5cf6' },
+  'BOLSA':        { label:'BOLSA',           color:'#10b981' },
+  'COMMODITIES':  { label:'COMMODITIES',     color:'#f59e0b' },
+  'FISCAL':       { label:'FISCAL',          color:'#ef4444' },
+  'POLÍTICA':     { label:'POLÍTICA',        color:'#ec4899' },
+  'M&A/CORP':     { label:'CORPORATIVO',     color:'#6366f1' },
+  'B3':           { label:'B3 / REGRAS',     color:'#14b8a6' },
+  'ELEIÇÃO':      { label:'ELEIÇÃO',         color:'#f97316' },
 };
+// Camadas (mesma lógica do Telegram)
+const TAGS_DESTAQUE = ['MACRO','JUROS/BC','FISCAL','COMMODITIES','B3','ELEIÇÃO'];
+const PALAVRAS_DESTAQUE = /\b(infla[çc][aã]o|pib|payroll|emprego|desemprego|copom|selic|fed|bce|opep|petr[oó]leo|d[oó]lar|c[aâ]mbio|d[ií]vida p[uú]blica|arcabou[cç]o fiscal|reforma tribut[aá]ria|tarifa|sanç[oõ]es)\b/i;
+function camadaDe(n) {
+  if (isBreaking(n.title)) return 'urgente';
+  if (TAGS_DESTAQUE.includes(n.impact_tag) || PALAVRAS_DESTAQUE.test(n.title || '')) return 'destaque';
+  return 'radar';
+}
 
 let activeNewsFilter = 'TODOS';
 
@@ -268,7 +286,15 @@ function renderNews() {
     return;
   }
 
-  list.innerHTML = filtered.map(n => {
+  const titulos = { urgente:'🚨 Alerta urgente', destaque:'📊 Destaques do dia', radar:'🔎 Radar' };
+  const grupos = { urgente:[], destaque:[], radar:[] };
+  filtered.forEach(n => grupos[camadaDe(n)].push(n));
+  list.innerHTML = Object.keys(grupos).filter(k => grupos[k].length).map(k => `
+    <div class="news-secao"><div class="news-secao-titulo">${titulos[k]}</div>
+    ${grupos[k].map(n => renderNewsRow(n)).join('')}</div>`).join('');
+}
+
+function renderNewsRow(n) {
     const breaking = isBreaking(n.title);
     const flag = FLAG_MAP[n.country_tag] || '🌐';
     const cat = CAT_MAP[n.impact_tag];
@@ -282,7 +308,6 @@ function renderNews() {
           <div class="news-meta">${catBadge}<span class="news-source">${n.source}</span></div>
         </div>
       </a>`;
-  }).join('');
 }
 
 let newsCache = [];
