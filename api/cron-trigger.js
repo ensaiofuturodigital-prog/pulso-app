@@ -3,6 +3,16 @@
 // isso é muito mais confiável que depender do "schedule:" do GitHub Actions
 // sozinho, que pode atrasar horas ou simplesmente não disparar.
 //
+// IMPORTANTE (corrigido em 29/10/2026 — bug de duplicidade):
+// Os inputs 'force_telegram' / 'force_send' dos workflows foram feitos para
+// TESTE MANUAL (ignoram a trava de duplicata do Supabase de propósito).
+// Esse disparo automático da Vercel NÃO pode usar 'true' aqui: se o robô do
+// GitHub já tivesse mandado a mensagem no mesmo horário, o disparo forçado
+// mandava de novo, duplicando no Telegram. Por isso os inputs ficam 'false':
+// o workflow roda como uma execução normal (calcula o horário-alvo e tenta
+// travar o slot no Supabase) — se já foi enviado, ele mesmo pula sozinho;
+// se não foi, ele manda, funcionando como reforço de verdade, sem duplicar.
+//
 // Variáveis de ambiente usadas (já configuradas na Vercel):
 //   GITHUB_ACTIONS_TOKEN  (mesmo token já usado em api/ingest.js)
 
@@ -45,11 +55,11 @@ export default async function handler(req, res) {
 
   try {
     if (job === 'radar') {
-      const r = await dispatch('pulso-radar.yml', { force_telegram: 'true' });
+      const r = await dispatch('pulso-radar.yml', { force_telegram: 'false' });
       return res.status(200).json({ job, dispatched: r });
     }
     if (job === 'prob') {
-      const r = await dispatch('probabilidades.yml', { force_send: 'true' });
+      const r = await dispatch('probabilidades.yml', { force_send: 'false' });
       return res.status(200).json({ job, dispatched: r });
     }
     return res.status(400).json({ error: 'job invalido, use ?job=radar ou ?job=prob' });
