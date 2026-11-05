@@ -1,5 +1,5 @@
 import { archiveAndPrune } from './lib/news-archive.js';
-import { ehUrgente, escaparMd, bandeira } from './lib/noticias-regras.js';
+import { ehUrgente, mensagemUrgente } from './lib/noticias-regras.js';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
@@ -88,6 +88,12 @@ const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=site:bcb.gov.br+(Copom+OR+Selic+OR+infla%C3%A7%C3%A3o+OR+comunicado)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Banco Central', lang: 'pt', category: 'JUROS/BC' },
   { url: 'https://news.google.com/rss/search?q=site:gov.br/cvm+(comunicado+OR+regra+OR+resolu%C3%A7%C3%A3o+OR+mercado)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'CVM', lang: 'pt', category: 'B3' },
   { url: 'https://news.google.com/rss/search?q=site:gov.br/tesouronacional+(d%C3%ADvida+OR+fiscal+OR+leil%C3%A3o)&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Tesouro Nacional', lang: 'pt', category: 'FISCAL' },
+  // ─── Política: Brasil, EUA e União Europeia (05/11/2026) ───
+  // semFiltro: política não usa a lista de palavras financeiras, só a lista de exclusão (esportes, celebridades etc.).
+  { url: 'https://news.google.com/rss/search?q=%22Congresso+Nacional%22+OR+Planalto+OR+STF+OR+%22C%C3%A2mara+dos+Deputados%22+OR+%22Senado+Federal%22+OR+Lula&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'Política Brasil', lang: 'pt', category: 'POLÍTICA', semFiltro: true, regiao: 'BR' },
+  { url: 'https://news.google.com/rss/search?q=site:g1.globo.com/politica&hl=pt-BR&gl=BR&ceid=BR:pt-BR', source: 'G1 Política', lang: 'pt', category: 'POLÍTICA', semFiltro: true, regiao: 'BR' },
+  { url: 'https://news.google.com/rss/search?q=Trump+OR+%22White+House%22+OR+Congress+OR+Senate+OR+%22Supreme+Court%22&hl=en-US&gl=US&ceid=US:en', source: 'Política EUA', lang: 'en', category: 'POLÍTICA', regiao: 'US' },
+  { url: 'https://news.google.com/rss/search?q=%22European+Union%22+OR+%22European+Commission%22+OR+%22European+Parliament%22+OR+Brussels+OR+%22EU+leaders%22&hl=en-US&gl=US&ceid=US:en', source: 'Política União Europeia', lang: 'en', category: 'POLÍTICA', regiao: 'EA' },
   // B3 oficial: mapa de notícias público do Bora Investir (formato sitemap de notícias)
   { url: 'https://borainvestir.b3.com.br/news-sitemap.xml', source: 'B3', lang: 'pt', category: 'B3', tipo: 'sitemap' },
 ];
@@ -112,9 +118,9 @@ const FINANCE_PT = [
 ];
 
 const REGIONS = [
-  { tag: 'BR', words: ['brasil','brasileiro','brasileira','copom','selic','ibovespa','lula','haddad','fazenda'] },
-  { tag: 'US', words: ['eua','estados unidos','fed','federal reserve','wall street','nasdaq','dow jones','powell','treasury'] },
-  { tag: 'EA', words: ['bce','zona do euro','europa','europeu','alemanha','lagarde','ecb'] },
+  { tag: 'BR', words: ['brasil','brasileiro','brasileira','copom','selic','ibovespa','lula','haddad','fazenda','planalto','congresso nacional','câmara dos deputados','camara dos deputados','stf','tse','senado federal'] },
+  { tag: 'US', words: ['eua','estados unidos','fed','federal reserve','wall street','nasdaq','dow jones','powell','treasury','trump','casa branca','white house','congresso americano','republicanos','democratas','washington'] },
+  { tag: 'EA', words: ['bce','zona do euro','europa','europeu','alemanha','lagarde','ecb','união europeia','uniao europeia','comissão europeia','comissao europeia','parlamento europeu','bruxelas','european union','brussels'] },
   { tag: 'CN', words: ['china','chinês','yuan','pboc','xangai','beijing'] },
   { tag: 'JP', words: ['japão','japonês','tóquio','boj','iene'] },
 ];
@@ -125,10 +131,10 @@ function classifyRegion(title) {
   return 'GLOBAL';
 }
 
-function passes(title, lang) {
+function passes(title, lang, semFiltro = false) {
   const t = title.toLowerCase();
   if (EXCLUDE.some(k => t.includes(k))) return false;
-  if (lang === 'en') return true;
+  if (lang === 'en' || semFiltro) return true;
   return FINANCE_PT.some(k => t.includes(k));
 }
 
@@ -169,8 +175,8 @@ function parseRss(xml, feed) {
     const link  = (block.match(/<link>([\s\S]*?)<\/link>/)   || [])[1]?.trim() || '';
     const pub   = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '';
     const date  = pub ? new Date(pub) : null;
-    return { title, url: link, pubDate: date, source: feed.source, category: feed.category, lang: feed.lang };
-  }).filter(i => i.title && i.url && i.pubDate && !isNaN(i.pubDate) && passes(i.title, feed.lang));
+    return { title, url: link, pubDate: date, source: feed.source, category: feed.category, lang: feed.lang, regiao: feed.regiao };
+  }).filter(i => i.title && i.url && i.pubDate && !isNaN(i.pubDate) && passes(i.title, feed.lang, feed.semFiltro));
 }
 
 // ─── ALERTA URGENTE IMEDIATO ───────────────────────────────────────────────
@@ -188,14 +194,7 @@ async function enviarUrgentes(items) {
     const slot = 'urgente_' + createHash('sha1').update(n.url).digest('hex').slice(0, 24);
     const { error } = await supabase.from('telegram_sends').insert({ slot });
     if (error) { if (error.code === '23505') continue; throw error; }
-    const texto = [
-      `🚨 *ALERTA URGENTE* ${bandeira(classifyRegion(n.title))}`,
-      '',
-      escaparMd(n.title),
-      '',
-      `Fonte: ${escaparMd(n.source)}`,
-      `[ler notícia](${n.url})`,
-    ].join('\n');
+    const texto = mensagemUrgente({ titulo: n.title, fonte: n.source, url: n.url, regiao: n.regiao || classifyRegion(n.title) });
     const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -245,7 +244,7 @@ async function run() {
       url: i.url,
       impact_tag: i.category,
       region: 'radar',
-      country_tag: classifyRegion(i.title),
+      country_tag: i.regiao || classifyRegion(i.title),
     }));
     const { error } = await supabase.from('news').upsert(rows, { onConflict: 'url', ignoreDuplicates: true });
     if (error) throw error;

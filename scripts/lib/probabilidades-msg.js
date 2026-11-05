@@ -8,18 +8,28 @@ export function cabecalhoData(dateStr) {
   return `${DIAS[d.getUTCDay()]}, ${d.getUTCDate()} de ${MESES[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
 }
 
+// Números grandes: dígitos em emoji (teclas) aparecem bem maiores que o texto normal do Telegram.
+function numeroGrande(n) {
+  return String(n).split('').map(d => d + '\uFE0F\u20E3').join('') + '%';
+}
+
 // up: % de chance de alta (0-100) | codigo: contrato em negociação (ex.: WDOX26)
 export function mensagemAtivo({ dateStr, nome, codigo, up }) {
   const linhas = [];
-  linhas.push(`*Probabilidades para day trade nos ativos hoje, ${cabecalhoData(dateStr)}.*`);
+  linhas.push('📊📊📊 *PROBABILIDADE DO DIA* 📊📊📊');
+  linhas.push('━━━━━━━━━━━━━━━━━━');
+  linhas.push(`*${nome.toUpperCase()} — ${codigo}*`);
+  linhas.push(`📅 ${cabecalhoData(dateStr)}`);
   linhas.push('');
   if (up == null) {
-    linhas.push(`*${nome}, ${codigo}*: sem dado suficiente hoje.`);
+    linhas.push('⚠️ *SEM DADO SUFICIENTE HOJE*');
   } else {
-    linhas.push(`*${nome}, ${codigo}*: ${up}% de chance de alta, ${100 - up}% de chance de baixa.`);
+    linhas.push(`🟢 *CHANCE DE ALTA:*  ${numeroGrande(up)}`);
+    linhas.push('');
+    linhas.push(`🔴 *CHANCE DE BAIXA:*  ${numeroGrande(100 - up)}`);
   }
-  linhas.push('');
-  linhas.push(`_Não é recomendação de operação._`);
+  linhas.push('━━━━━━━━━━━━━━━━━━');
+  linhas.push('_Não é recomendação de operação._');
   return linhas.join('\n');
 }
 
