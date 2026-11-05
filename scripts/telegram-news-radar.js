@@ -9,7 +9,8 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Camadas, tarjas e formatação ficam em scripts/lib/noticias-regras.js
-import { montarResumo } from './lib/noticias-regras.js';
+import { montarResumo, ehUrgente } from './lib/noticias-regras.js';
+import { createHash } from 'crypto';
 
 async function buildDigest() {
   const cutoff = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
@@ -22,10 +23,24 @@ async function buildDigest() {
   if (error) throw error;
   if (!data || data.length === 0) return null;
 
+  // Urgentes que já saíram como alerta imediato (fetch-news-radar.js) não
+  // entram de novo no resumo — era isso que duplicava as mensagens no grupo.
+  const slotDe = (url) => 'urgente_' + createHash('sha1').update(url).digest('hex').slice(0, 24);
+  const urgentes = data.filter(n => ehUrgente(n.title || ''));
+  let jaAlertados = new Set();
+  if (urgentes.length) {
+    const { data: enviados, error: errSlots } = await supabase
+      .from('telegram_sends').select('slot').in('slot', urgentes.map(n => slotDe(n.url)));
+    if (errSlots) throw errSlots;
+    jaAlertados = new Set((enviados || []).map(r => r.slot));
+  }
+  const itens = data.filter(n => !(ehUrgente(n.title || '') && jaAlertados.has(slotDe(n.url))));
+  if (itens.length === 0) return null;
+
   const agora = new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
   }).format(new Date());
-  return montarResumo(data, agora);
+  return montarResumo(itens, agora);
 }
 
 async function sendTelegram(text) {
