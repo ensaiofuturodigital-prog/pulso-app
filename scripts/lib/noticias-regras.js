@@ -90,10 +90,15 @@ export function linhaNoticia(n) {
   return `${t.icone} *${t.nome}* ${bandeira(n.country_tag)}\n${escaparMd(n.title)}\n[ler notícia](${n.url})\n`;
 }
 
+// Dentro de negrito o Telegram não aceita escape com barra invertida: tira os caracteres especiais.
+function textoNegrito(texto) {
+  return String(texto).replace(/[_*`\[\]]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+
 // Urgente: título em negrito e MAIÚSCULAS, para chamar atenção.
 export function linhaUrgente(n) {
   const t = tarja(n.impact_tag);
-  return `${t.icone} *${t.nome}* ${bandeira(n.country_tag)}\n*${escaparMd(String(n.title).toUpperCase())}*\n[ler notícia](${n.url})\n`;
+  return `${t.icone} *${t.nome}* ${bandeira(n.country_tag)}\n*${textoNegrito(n.title)}*\n[ler notícia](${n.url})\n`;
 }
 
 // Alerta urgente enviado na hora (um por notícia).
@@ -103,7 +108,7 @@ export function mensagemUrgente({ titulo, fonte, url, regiao }) {
     `🚨 *ALERTA URGENTE* ${bandeira(regiao)}`,
     '🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨',
     '',
-    `*${escaparMd(String(titulo).toUpperCase())}*`,
+    `*${textoNegrito(titulo)}*`,
     '',
     `Fonte: ${escaparMd(fonte)}`,
     `[ler notícia](${url})`,
