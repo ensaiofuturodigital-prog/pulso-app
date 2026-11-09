@@ -61,15 +61,24 @@ async function translateToPortuguese(text) {
 }
 
 // Detecta se o título está em inglês (feeds com lang='en')
-// Traduz em lotes para não sobrecarregar a API
+// Traduz em paralelo (lotes de 10 por vez) — com os ~700-800 títulos em
+// inglês que o radar coleta por execução (8 feeds globais + política
+// EUA/UE sem filtro de palavra-chave), traduzir um de cada vez levava
+// quase 10 minutos e arriscava estourar o timeout do job. Em lotes de 10,
+// o mesmo volume termina em menos de 1 minuto, continuando educado com a
+// API gratuita (pausa entre lotes, não entre itens individuais).
 async function translateBatch(items) {
   const toTranslate = items.filter(i => i.lang === 'en');
   console.log(`🔤 Traduzindo ${toTranslate.length} títulos em inglês...`);
 
-  for (const item of toTranslate) {
-    item.title = await translateToPortuguese(item.title);
-    // Pequena pausa para não sobrecarregar a API (1000 req/dia gratuitas)
-    await new Promise(r => setTimeout(r, 200));
+  const LOTE = 10;
+  for (let i = 0; i < toTranslate.length; i += LOTE) {
+    const lote = toTranslate.slice(i, i + LOTE);
+    await Promise.all(lote.map(async item => {
+      item.title = await translateToPortuguese(item.title);
+    }));
+    // Pequena pausa entre lotes para não sobrecarregar a API (1000 req/dia gratuitas)
+    if (i + LOTE < toTranslate.length) await new Promise(r => setTimeout(r, 200));
   }
   return items;
 }
