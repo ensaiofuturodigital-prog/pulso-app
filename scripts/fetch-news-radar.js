@@ -12,9 +12,25 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Google Translate (endpoint público, sem API key) como principal — aguenta
 // bem mais volume que o MyMemory. MyMemory fica como reserva, e só se ambos
 // falharem é que o título original em inglês é mantido.
+// Timeout curto (8s) é essencial aqui: sem ele, uma única chamada travada
+// nesses endpoints públicos (sem SLA) prendia o script inteiro — e com
+// `cancel-in-progress: false` no workflow, isso enfileirava TODAS as
+// próximas execuções (mesmo as agendadas) atrás da travada, por horas,
+// até o timeout de 6h do próprio job do GitHub Actions. Foi a causa real
+// por trás dos atrasos enormes e aparentemente aleatórios do Radar.
+async function fetchComTimeout(url, opts = {}, ms = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function translateGoogle(text) {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(text)}`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const res = await fetchComTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   // Formato: [[["texto traduzido","texto original",null,null,...], ...], ...]
@@ -25,7 +41,7 @@ async function translateGoogle(text) {
 
 async function translateMyMemory(text) {
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|pt-BR`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const res = await fetchComTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   const data = await res.json();
   const translated = data.responseData?.translatedText;
   if (!translated || translated === text) throw new Error('sem tradução');
@@ -195,7 +211,7 @@ async function enviarUrgentes(items) {
     const { error } = await supabase.from('telegram_sends').insert({ slot });
     if (error) { if (error.code === '23505') continue; throw error; }
     const texto = mensagemUrgente({ titulo: n.title, fonte: n.source, url: n.url, regiao: n.regiao || classifyRegion(n.title) });
-    const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    const res = await fetchComTimeout(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: TG_CHAT, text: texto, parse_mode: 'Markdown', disable_web_page_preview: true }),

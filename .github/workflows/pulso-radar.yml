@@ -17,6 +17,14 @@ concurrency:
 jobs:
   radar:
     runs-on: ubuntu-latest
+    # Rede de segurança: sem isso, o job podia travar por até 6h (padrão do
+    # GitHub Actions) se algum site externo não respondesse. E com o
+    # "concurrency" acima (cancel-in-progress: false), um job travado
+    # enfileirava TODAS as próximas execuções atrás dele — foi a causa real
+    # dos atrasos de horas que vínhamos vendo. Corrigido também na raiz
+    # (timeout nas chamadas de tradução em fetch-news-radar.js); isto aqui é
+    # só a segunda camada de proteção.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
