@@ -41,3 +41,17 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FORCE_SEND: ${{ github.event.inputs.force_telegram }}
+
+      # Reforço: o workflow "Probabilidades WDO/WIN" tem seu próprio gatilho
+      # (cron do GitHub + cron da Vercel), mas se ambos falharem num dia, essa
+      # chamada aqui pega o problema de qualquer jeito — o Radar dispara com
+      # muito mais frequência e vem se mostrando o canal mais confiável. Sem
+      # risco de duplicar: o script já checa sozinho se as probabilidades de
+      # hoje já foram enviadas (trava no Supabase) e só manda se não foram.
+      - name: Reforço - garante que as probabilidades do dia também saíram
+        run: node scripts/telegram-daily-report.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

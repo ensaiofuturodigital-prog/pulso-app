@@ -20,6 +20,16 @@ function todayStrBRT() {
   return brt.toISOString().slice(0, 10);
 }
 
+// Esse script agora também é chamado de "carona" pelo Pulso Radar (que roda o
+// dia inteiro), além do seu próprio cron. Sem essa janela, uma falha nos dois
+// horários normais faria ele tentar enviar de madrugada, com dado desatualizado.
+// Janela larga (05:00–11:00 Brasília) cobre o horário principal, o backup e
+// ainda dá margem de sobra para catch-up caso os dois atrasem ou falhem.
+function isWithinSendWindowBRT() {
+  const hourBRT = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCHours();
+  return hourBRT >= 5 && hourBRT < 11;
+}
+
 function fmtDateLabel(dateStr) {
   return new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(dateStr + 'T12:00:00'));
 }
@@ -186,6 +196,10 @@ async function run() {
   const forced = process.env.FORCE_SEND === 'true';
   if (!forced && isNonTradingDay(dateStr)) {
     console.log(`${dateStr} é fim de semana ou feriado — sem dado econômico novo, não envia probabilidades hoje.`);
+    return;
+  }
+  if (!forced && !isWithinSendWindowBRT()) {
+    console.log('Fora da janela de envio (05:00–11:00 Brasília) — só verificando, sem mandar agora.');
     return;
   }
   if (forced) {
