@@ -25,9 +25,22 @@ function todayStrBRT() {
 // horários normais faria ele tentar enviar de madrugada, com dado desatualizado.
 // Janela larga (05:00–11:00 Brasília) cobre o horário principal, o backup e
 // ainda dá margem de sobra para catch-up caso os dois atrasem ou falhem.
-function isWithinSendWindowBRT() {
-  const hourBRT = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCHours();
-  return hourBRT >= 5 && hourBRT < 11;
+// Probabilidades saem 2 vezes por dia útil (Brasília): ~05:30 e ~06:30 (reenvio).
+// 1º envio: de 05:10 a 06:10 | 2º envio: de 06:10 até 09:00 (cobre atraso do disparador).
+// Retorna o sufixo do slot ('' ou '_2'), ou null se estiver fora das janelas.
+const PROB_ENVIOS = [
+  { sufixo: '',   alvo: 5 * 60 + 30, antes: 20, depois: 40 },
+  { sufixo: '_2', alvo: 6 * 60 + 30, antes: 20, depois: 150 },
+];
+function slotProbAtualBRT() {
+  const d = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const nowMin = d.getUTCHours() * 60 + d.getUTCMinutes();
+  let achado = null;
+  for (const e of PROB_ENVIOS) {
+    const diff = nowMin - e.alvo;
+    if (diff >= -e.antes && diff <= e.depois) achado = e.sufixo;  // o último que casar vence
+  }
+  return achado;
 }
 
 function fmtDateLabel(dateStr) {
@@ -198,16 +211,17 @@ async function run() {
     console.log(`${dateStr} é fim de semana ou feriado — sem dado econômico novo, não envia probabilidades hoje.`);
     return;
   }
-  if (!forced && !isWithinSendWindowBRT()) {
-    console.log('Fora da janela de envio (05:00–11:00 Brasília) — só verificando, sem mandar agora.');
+  const sufixo = slotProbAtualBRT();
+  if (!forced && sufixo === null) {
+    console.log('Fora das janelas de envio das probabilidades (05:30 e 06:30 Brasília) — nada a fazer agora.');
     return;
   }
   if (forced) {
     console.log('⚠️ Envio forçado (teste manual) — ignorando checagem de fim de semana/feriado e de duplicata.');
   } else {
-    const claimed = await claimSlot(`prob_${dateStr}`);
+    const claimed = await claimSlot(`prob_${dateStr}${sufixo}`);
     if (!claimed) {
-      console.log(`⏭️  Probabilidades de ${dateStr} já enviadas hoje (principal ou backup) — evitando duplicata.`);
+      console.log(`⏭️  Probabilidades de ${dateStr} já enviadas nesse horário — evitando duplicata.`);
       return;
     }
   }

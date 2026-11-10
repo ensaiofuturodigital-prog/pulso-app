@@ -2,8 +2,8 @@ name: Probabilidades WDO/WIN
 
 on:
   schedule:
-    - cron: '37 8 * * 1-5'   # 05:37 Brasília (horário principal)
-    - cron: '7 9 * * 1-5'    # 06:07 Brasília (backup — só envia se o principal falhou ou atrasou)
+    - cron: '30 8 * * 1-5'   # 05:30 Brasília (1º envio)
+    - cron: '30 9 * * 1-5'   # 06:30 Brasília (2º envio)
   workflow_dispatch:
     inputs:
       force_send:

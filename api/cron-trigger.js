@@ -45,7 +45,10 @@ export default async function handler(req, res) {
   // liberavam o disparo, e ambos podiam ser falsificados por qualquer um.
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers['authorization'];
-  const autorizado = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+  // Também aceita o segredo do agendador do Supabase (pg_cron), que dispara no minuto exato.
+  const pgSecret = process.env.PG_CRON_SECRET;
+  const autorizado = (!!cronSecret && authHeader === `Bearer ${cronSecret}`)
+    || (!!pgSecret && authHeader === `Bearer ${pgSecret}`);
 
   if (!autorizado) {
     return res.status(401).json({ error: 'unauthorized' });
@@ -56,11 +59,13 @@ export default async function handler(req, res) {
   try {
     if (job === 'radar') {
       const r = await dispatch('pulso-radar.yml', { force_telegram: 'false' });
-      return res.status(200).json({ job, dispatched: r });
+      console.log(`cron-trigger ${job}: GitHub respondeu ${r.status}`);
+      return res.status(r.ok ? 200 : 502).json({ job, dispatched: r });
     }
     if (job === 'prob') {
       const r = await dispatch('probabilidades.yml', { force_send: 'false' });
-      return res.status(200).json({ job, dispatched: r });
+      console.log(`cron-trigger ${job}: GitHub respondeu ${r.status}`);
+      return res.status(r.ok ? 200 : 502).json({ job, dispatched: r });
     }
     return res.status(400).json({ error: 'job invalido, use ?job=radar ou ?job=prob' });
   } catch (err) {

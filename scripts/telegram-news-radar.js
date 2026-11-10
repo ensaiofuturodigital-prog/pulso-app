@@ -78,8 +78,12 @@ async function sendTelegram(text) {
 // cada poucos minutos. Por isso: janela larga (55 min) ao redor de cada
 // horário-alvo + trava de duplicidade no Supabase (garante 1 envio por slot,
 // mesmo que o workflow rode várias vezes dentro da mesma janela).
-const SEND_TARGETS_BRT = ['04:38', '06:38', '08:38', '11:38', '18:38'];
-const TOLERANCE_MIN = 58; // fica abaixo da metade do menor intervalo entre horários-alvo (120min), evitando sobreposição de janelas, e ainda cobre quase toda a folga de 1h do cron da Vercel
+// Horários de envio (Brasília). Cada envio pode sair de 20 min antes até 90 min depois do horário-alvo
+// (tolera atraso do disparador). Se mais de uma janela casar, vale a do horário mais recente.
+// Uma trava por horário/dia no Supabase garante 1 envio só.
+const SEND_TARGETS_BRT = ['05:10', '06:15', '07:30', '08:30', '11:00', '14:00', '17:00', '20:00', '22:00'];
+const ANTES_MIN = 20;
+const DEPOIS_MIN = 90;
 
 function nowInBrasilia() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -98,17 +102,13 @@ function nowInBrasilia() {
 function findMatchingSlot() {
   const { date, hour, minute } = nowInBrasilia();
   const nowMin = hour * 60 + minute;
+  let achado = null;
   for (const t of SEND_TARGETS_BRT) {
     const [th, tm] = t.split(':').map(Number);
-    const targetMin = th * 60 + tm;
-    let diff = nowMin - targetMin;
-    if (diff < -720) diff += 1440;   // trata virada de dia nos dois sentidos
-    if (diff > 720) diff -= 1440;
-    if (Math.abs(diff) <= TOLERANCE_MIN) {
-      return `${date}_${t}`;
-    }
+    const diff = nowMin - (th * 60 + tm);   // positivo = depois do horário-alvo
+    if (diff >= -ANTES_MIN && diff <= DEPOIS_MIN) achado = `${date}_${t}`;  // o último que casar vence
   }
-  return null;
+  return achado;
 }
 
 async function claimSlot(slot) {
